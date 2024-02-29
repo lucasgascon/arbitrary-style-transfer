@@ -1,7 +1,22 @@
 import torch.nn as nn
 from torchvision import models
 import torch
-from utils import AdaIN
+
+def calc_mean_std(x):
+    batch_size, num_channels, h, w = x.size()
+    x = x.view(batch_size, num_channels, -1)
+    mean = x.mean(dim=2).view(batch_size, num_channels, 1, 1)
+    std = x.std(dim=2).view(batch_size, num_channels, 1, 1)
+    return mean, std
+
+class AdaIN(nn.Module):
+    def __init__(self):
+        super(AdaIN, self).__init__()
+    
+    def forward(self, content, style):
+        meanC, stdC = calc_mean_std(content)
+        meanS, stdS = calc_mean_std(style)
+        return stdS * (content - meanC) / stdC + meanS
 
 class Encoder(nn.Module):
     def __init__(self):
@@ -57,9 +72,10 @@ def StyleTransferNet():
     def __init__(self):
         super(StyleTransferNet, self).__init__()
         self.encoder = Encoder()
+        self.adain = AdaIN()
         self.decoder = Decoder()
         
     def forward(self, content, style):
         content, style = self.encoder(content, style)
-        content = AdaIN(content, style)
+        content = self.adain(content, style)
         return self.decoder(content)
