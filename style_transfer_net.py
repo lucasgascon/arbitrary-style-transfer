@@ -63,6 +63,7 @@ class Decoder(nn.Module):
                 nn.ReLU(inplace=True),
                 nn.Conv2d(64, 3, kernel_size=3, stride=1, padding=1),
                 nn.Tanh()
+            )
                 
 class StyleTransferNet():
     def __init__(self):
