@@ -63,15 +63,13 @@ class Decoder(nn.Module):
                 nn.ReLU(inplace=True),
                 nn.Conv2d(64, 3, kernel_size=3, stride=1, padding=1),
                 nn.Tanh()
-            )
-
-        def forward(self, x):
-            return self.decoder_content(x)
-        
-def StyleTransferNet():
+                
+class StyleTransferNet():
     def __init__(self):
         super(StyleTransferNet, self).__init__()
         self.encoder = Encoder()
+        for param in self.encoder.parameters():
+            param.requires_grad = False # freeze the encoder
         self.adain = AdaIN()
         self.decoder = Decoder()
         
