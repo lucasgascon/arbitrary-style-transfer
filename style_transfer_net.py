@@ -27,10 +27,9 @@ class Encoder(nn.Module):
     def forward(self, x, y):
         return self.encoder_content(x), self.encoder_style(y)
 
-class Decoder(nn.Module):
+class Decoder(nn.Module): # check the number of layers, and the choice of the layers
         def __init__(self):
             super(Decoder, self).__init__()
-            # check the number of layers
             self.decoder_content = nn.Sequential(
                 nn.Upsample(scale_factor=2, mode='nearest'),
                 nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1),
