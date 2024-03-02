@@ -26,6 +26,46 @@ class Encoder(nn.Module):
     
     def forward(self, x, y):
         return self.encoder_content(x), self.encoder_style(y)
+    
+class ResBlock(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(ResBlock, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=1)
+        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1)
+        self.relu = nn.ReLU(inplace=True)
+    
+    def forward(self, x):
+        return x + self.relu(self.conv2(self.relu(self.conv1(x))))  
+       
+class Residual_Decoder(nn.Module): # check the number of layers, and the choice of the layers
+        def __init__(self):
+            super(Residual_Decoder, self).__init__()
+            self.decoder_content = nn.Sequential(
+                nn.Upsample(scale_factor=2, mode='nearest'),
+                nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1),
+                nn.ReLU(inplace=True),
+                nn.Upsample(scale_factor=2, mode='nearest'),
+                ResBlock(512, 512),
+                nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1),
+                nn.ReLU(inplace=True),
+                nn.Upsample(scale_factor=2, mode='nearest'),
+                nn.Conv2d(512, 256, kernel_size=3, stride=1, padding=1),
+                nn.ReLU(inplace=True),
+                ResBlock(256, 256),
+                nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1),
+                nn.ReLU(inplace=True),
+                nn.Upsample(scale_factor=2, mode='nearest'),
+                nn.Conv2d(256, 128, kernel_size=3, stride=1, padding=1),
+                nn.ReLU(inplace=True),
+                ResBlock(128, 128),
+                nn.Upsample(scale_factor=2, mode='nearest'),
+                nn.Conv2d(128, 64, kernel_size=3, stride=1, padding=1),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(64, 3, kernel_size=3, stride=1, padding=1),
+                nn.Tanh()
+            )
 
 class Decoder(nn.Module): # check the number of layers, and the choice of the layers
         def __init__(self):
