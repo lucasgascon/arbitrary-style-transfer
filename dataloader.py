@@ -39,8 +39,12 @@ def create_dataloader(content_path, style_path, trainset, batch_size=1, shuffle=
             transforms.RandomCrop(256),
             transforms.ToTensor()
         ])
-    else: transform = None
-    
+    else: 
+        transform = transforms.Compose([
+            transforms.ToPILImage(),
+            transforms.ToTensor()
+        ])
+        
     content_dataset = CustomDataset(content_path, transform=transform)
     content_dataloader = DataLoader(content_dataset, batch_size=batch_size, shuffle=shuffle)
     

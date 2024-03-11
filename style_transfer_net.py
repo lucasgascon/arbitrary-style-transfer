@@ -17,7 +17,17 @@ def adain(content, style):
 class Encoder(nn.Module):
     def __init__(self):
         super(Encoder, self).__init__()
-        self.encoder = nn.Sequential(*list(vgg19(weights=VGG19_Weights.DEFAULT).features.children())[:22]) # check the number of layers
+        original_model = vgg19(weights=VGG19_Weights.DEFAULT)
+        original_features = list(original_model.features.children())[:22]
+        modified_features = nn.Sequential()
+        for i, layer in enumerate(original_features):
+            if isinstance(layer, nn.ReLU) and layer.inplace:
+                # If the layer is a ReLU with inplace=True, replace it with a ReLU with inplace=False
+                modified_features.add_module(f"relu_{i}", nn.ReLU(inplace=False))
+            else:
+                # Otherwise, just add the original layer
+                modified_features.add_module(str(i), layer)
+        self.encoder = modified_features
     
     def forward(self, x):
         return self.encoder(x)

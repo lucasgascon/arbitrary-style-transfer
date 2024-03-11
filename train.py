@@ -58,9 +58,7 @@ def train(n_epochs, args):
 
             style_loss = torch.sum(torch.stack(style_layer_loss))
             
-            # decoder_loss = content_loss + args.style_weight * style_loss
-            decoder_loss = content_loss
-            # decoder_loss = style_loss
+            decoder_loss = content_loss + args.style_weight * style_loss
             
             # print('content_loss:', content_loss)
             # print('style_loss:', style_loss)
