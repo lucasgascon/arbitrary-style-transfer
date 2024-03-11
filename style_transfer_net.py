@@ -1,82 +1,70 @@
 import torch.nn as nn
-from torchvision import models
-import torch
+from torchvision.models import vgg19, VGG19_Weights
 
 def calc_mean_std(x):
     batch_size, num_channels, h, w = x.size()
-    x = x.view(batch_size, num_channels, -1)
-    mean = x.mean(dim=2).view(batch_size, num_channels, 1, 1)
-    std = x.std(dim=2).view(batch_size, num_channels, 1, 1)
-    return mean, std
+    x_view = x.view(batch_size, num_channels, -1)
+    mean_ = x_view.mean(dim=2).view(batch_size, num_channels, 1, 1)
+    std_ = x_view.std(dim=2).view(batch_size, num_channels, 1, 1)
+    return mean_, std_
 
-class AdaIN(nn.Module):
-    def __init__(self):
-        super(AdaIN, self).__init__()
-    
-    def forward(self, content, style):
-        meanC, stdC = calc_mean_std(content)
-        meanS, stdS = calc_mean_std(style)
-        return stdS * (content - meanC) / (stdC + 1e-8) + meanS
+def adain(content, style):
+    meanC, stdC = calc_mean_std(content)
+    meanS, stdS = calc_mean_std(style)
+    output = stdS * (content - meanC) / (stdC + 1e-8) + meanS
+    return output
 
 class Encoder(nn.Module):
     def __init__(self):
         super(Encoder, self).__init__()
-        self.encoder_content = nn.Sequential(*list(models.vgg19(pretrained=True).features.children())[:23]) # check the number of layers
-        self.encoder_style = nn.Sequential(*list(models.vgg19(pretrained=True).features.children())[:23]) # check the number of layers
+        self.encoder = nn.Sequential(*list(vgg19(weights=VGG19_Weights.DEFAULT).features.children())[:22]) # check the number of layers
     
-    def forward(self, x, y):
-        return self.encoder_content(x), self.encoder_style(y)
-    
-class Decoder(nn.Module): # check the number of layers, and the choice of the layers
+    def forward(self, x):
+        return self.encoder(x)
+
+class Decoder(nn.Module): # check the choice of the layers
         def __init__(self):
             super(Decoder, self).__init__()
             self.decoder_content = nn.Sequential(
-                nn.Upsample(scale_factor=2, mode='nearest'),
-                nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1),
-                nn.ReLU(inplace=True),
-                nn.Upsample(scale_factor=2, mode='nearest'),
-                nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1),
-                nn.ReLU(inplace=True),
-                nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1),
-                nn.ReLU(inplace=True),
-                nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1),
-                nn.ReLU(inplace=True),
-                nn.Upsample(scale_factor=2, mode='nearest'),
+                # Start with 32x32 features
+                nn.Upsample(scale_factor=2, mode='nearest'),  # 64x64
                 nn.Conv2d(512, 256, kernel_size=3, stride=1, padding=1),
-                nn.ReLU(inplace=True),
+                nn.ReLU(inplace=False),
+
                 nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1),
-                nn.ReLU(inplace=True),
-                nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1),
-                nn.ReLU(inplace=True),
-                nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1),
-                nn.ReLU(inplace=True),
-                nn.Upsample(scale_factor=2, mode='nearest'),
+                nn.ReLU(inplace=False),
+                
+                nn.Upsample(scale_factor=2, mode='nearest'),  # 128x128
                 nn.Conv2d(256, 128, kernel_size=3, stride=1, padding=1),
-                nn.ReLU(inplace=True),
+                nn.ReLU(inplace=False),
+
                 nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1),
-                nn.ReLU(inplace=True),
-                nn.Upsample(scale_factor=2, mode='nearest'),
+                nn.ReLU(inplace=False),
+
+                nn.Upsample(scale_factor=2, mode='nearest'),  # 256x256
                 nn.Conv2d(128, 64, kernel_size=3, stride=1, padding=1),
-                nn.ReLU(inplace=True),
-                nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),
-                nn.ReLU(inplace=True),
+                nn.ReLU(inplace=False),
+
                 nn.Conv2d(64, 3, kernel_size=3, stride=1, padding=1),
                 nn.Tanh()
             )
         
         def forward(self, x):
             return self.decoder_content(x)
-                
+
+STYLE_LAYERS = [1, 6, 11, 20]
+       
 class StyleTransferNet(nn.Module):
     def __init__(self):
         super(StyleTransferNet, self).__init__()
         self.encoder = Encoder()
+        self.style_layers = [self.encoder.encoder[i] for i in STYLE_LAYERS]
         for param in self.encoder.parameters():
             param.requires_grad = False # freeze the encoder
-        self.adain = AdaIN()
         self.decoder = Decoder()
         
     def forward(self, content, style):
-        content, style = self.encoder(content, style)
-        content = self.adain(content, style)
-        return self.decoder(content)
+        content_features = self.encoder(content).detach()
+        style_features = self.encoder(style).detach()
+        t = adain(content_features, style_features).detach()
+        return self.decoder(t)
