@@ -11,6 +11,13 @@ torch.autograd.set_detect_anomaly(True)
 
 STYLE_LAYERS = [1, 6, 11, 20]
 
+def gram_matrix(y):
+    (b, ch, h, w) = y.size()
+    features = y.view(b, ch, w * h)
+    features_t = features.transpose(1, 2)
+    gram = features.bmm(features_t) / (ch * h * w)
+    return gram
+
 def train(args):
     
     content_trainloader, style_trainloader = create_dataloader(args.train_content_imgs, args.train_style_imgs, trainset=True, batch_size=args.batch_size, shuffle=True)
@@ -20,6 +27,8 @@ def train(args):
     model = StyleTransferNet().to(args.device)
     
     optimizer = torch.optim.Adam(model.decoder.parameters(), lr=args.lr)
+    
+    content_criterion = torch.nn.MSELoss()
     
     for epoch in tqdm(range(args.n_epochs)):
         model.train()
@@ -37,28 +46,24 @@ def train(args):
             invert_output = model.encoder(output)
             
             # compute the content loss
-            content_loss = torch.sum(torch.mean((invert_output - t) ** 2, dim=[2, 3]))
+            # content_loss = torch.sum(torch.mean((invert_output - t) ** 2, dim=[2, 3]))
+            content_loss = content_criterion(invert_output, t)
             
             # compute the style loss
             style_layer_loss = []
-            
             for layer in model.style_layers:
                 style_features = layer(style_batch).detach()
-                gen_features = layer(output)
-
+                gen_features = layer(output)  
                 meanS, varS = calc_mean_std(style_features)
                 meanG, varG = calc_mean_std(gen_features)
-
                 sigmaS = torch.sqrt(varS + args.epsilon)
                 sigmaG = torch.sqrt(varG + args.epsilon)
-
                 l2_mean = torch.sum(torch.square(meanG - meanS))
                 l2_sigma = torch.sum(torch.square(sigmaG - sigmaS))
-
                 style_layer_loss.append(l2_mean + l2_sigma)
-
+                # style_layer_loss.append(nn.functional.mse_loss(gram_matrix(style_features), gram_matrix(gen_features)))
             style_loss = torch.sum(torch.stack(style_layer_loss))
-            
+        
             decoder_loss = content_loss + args.style_weight * style_loss
             
             if i == 0:
@@ -90,7 +95,7 @@ def train(args):
 if __name__ == '__main__':        
     parser = argparse.ArgumentParser()
     parser.add_argument('--n_epochs', type=int, default=1, help='Number of epochs')
-    parser.add_argument('--batch_size', type=int, default=64, help='Batch size')
+    parser.add_argument('--batch_size', type=int, default=8, help='Batch size')
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     parser.add_argument('--device', type=str, default=device, help='Device to train the model')
     parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
@@ -103,8 +108,9 @@ if __name__ == '__main__':
     parser.add_argument('--test_content_imgs', type=str, default=None, help='Path to the test content images')
     parser.add_argument('--test_style_imgs', type=str, default=None, help='Path to the test style images')
     parser.add_argument('--model_name', type=str, default='model.pth', help='Path to save the trained model')
-    args = vars(parser.parse_args())
+    args = parser.parse_args()
     
     model = train(args)
     
-    torch.save(model.state_dict(), args.model_name)
+    model_path = 'models/' + args.model_name
+    torch.save(model.state_dict(), model_path)
