@@ -46,10 +46,10 @@ def create_dataloader(content_path, style_path, trainset, batch_size=1, shuffle=
         ])
         
     content_dataset = CustomDataset(content_path, transform=transform)
-    content_dataloader = DataLoader(content_dataset, batch_size=batch_size, shuffle=shuffle)
+    content_dataloader = DataLoader(content_dataset, batch_size=batch_size, shuffle=shuffle, drop_last=True)
     
     style_dataset = CustomDataset(style_path, transform=transform)
-    style_dataloader = DataLoader(style_dataset, batch_size=batch_size, shuffle=shuffle)
+    style_dataloader = DataLoader(style_dataset, batch_size=batch_size, shuffle=shuffle, drop_last=True)
 
     return content_dataloader, style_dataloader
  
