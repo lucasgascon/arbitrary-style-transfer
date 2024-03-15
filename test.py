@@ -3,15 +3,14 @@ import torch
 import argparse
 import matplotlib.pyplot as plt
 import numpy as np
-from torchvision.utils import save_image
 from style_transfer_net import StyleTransferNet
 from dataloader import create_dataloader
 
 def test(args):
-    model = StyleTransferNet().to(args.device)
+    model = StyleTransferNet(args.skipco, args.alpha).to(args.device)
     
     model_path = 'models/' + args.model_name
-    model.load_state_dict(torch.load(model_path, map_location=args.device))
+    model.decoder.load_state_dict(torch.load(model_path, map_location=args.device))
     
     content_testloader, style_testloader = create_dataloader(args.test_content_imgs, args.test_style_imgs, trainset=False, batch_size=1, shuffle=False)
     
@@ -52,5 +51,7 @@ if __name__ == '__main__':
     parser.add_argument('--model_name', type=str, default='model.pth', help='Name of the trained model')
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     parser.add_argument('--device', type=str, default=device, help='Device to run the model on')
+    parser.add_argument('--skipco', action='store_true', help='Use skip connections in the decoder')
+    parser.add_argument('--alpha', type=float, default=1, help='Alpha value for style/content tradeoff')
     args = parser.parse_args()
     test(args)
