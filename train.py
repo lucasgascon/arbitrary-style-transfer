@@ -101,14 +101,14 @@ def train(args):
                         'Overall Loss': decoder_loss.item()}, step=(epoch*len_data+i))
 
             
-            if (epoch + 1)*(i+1) % args.save_model_interval == 0:
+            if (epoch*len_data+i) % args.save_model_interval == 0:
                 state_dict = model.decoder.state_dict()
                 for key in state_dict.keys():
                     state_dict[key] = state_dict[key].to(torch.device('cpu'))
                 torch.save(state_dict, 'models/'+args.model_name+'decoder_epoch_{:d}.pth.tar'.format(epoch))
              
-        decoder_loss.backward()
-        optimizer.step()
+            decoder_loss.backward()
+            optimizer.step()
          
         if args.test:
             model.eval()
