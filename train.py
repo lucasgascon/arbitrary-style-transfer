@@ -60,7 +60,7 @@ def train(args):
     
     for epoch in range(args.n_epochs):
         for i, (content_batch, style_batch) in tqdm(enumerate(zip(content_trainloader, style_trainloader))):
-            adjust_learning_rate(optimizer, args.lr, args.lr_decay, (epoch+1)*i)
+            adjust_learning_rate(optimizer, args.lr, args.lr_decay, (epoch*len_data+i))
             optimizer.zero_grad()
             content_batch = content_batch.to(args.device)
             style_batch = style_batch.to(args.device)
@@ -98,7 +98,7 @@ def train(args):
             # Logging to Weights and Biases
             if (args.wandb):
                 wandb.log({'Content Loss': content_loss.item(), 'Style IoU': style_loss.item(),
-                        'Overall Loss': decoder_loss.item()}, step=(1+epoch*len_data)*(i+1))
+                        'Overall Loss': decoder_loss.item()}, step=(epoch*len_data+i))
 
             
             if (epoch + 1)*(i+1) % args.save_model_interval == 0:
