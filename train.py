@@ -55,10 +55,11 @@ def train(args):
     
     mse_loss = torch.nn.MSELoss()
     
-    model.train()
+
     model.to(args.device)
     
     for epoch in range(args.n_epochs):
+        model.train()
         for i, (content_batch, style_batch) in tqdm(enumerate(zip(content_trainloader, style_trainloader))):
             adjust_learning_rate(optimizer, args.lr, args.lr_decay, (epoch*len_data+i))
             optimizer.zero_grad()
@@ -97,8 +98,8 @@ def train(args):
                       'Total loss: ', decoder_loss.item())
             # Logging to Weights and Biases
             if (args.wandb):
-                wandb.log({'Content Loss': content_loss.item(), 'Style IoU': style_loss.item(),
-                        'Overall Loss': decoder_loss.item()}, step=(epoch*len_data+i))
+                wandb.log({'Train content Loss': content_loss.item(), ' Train style loss': style_loss.item(),
+                        'Train overall Loss': decoder_loss.item()}, step=(epoch*len_data+i))
 
             
             if (epoch*len_data+i) % args.save_model_interval == 0:
@@ -117,15 +118,64 @@ def train(args):
                     content_batch = content_batch.to(args.device)
                     style_batch = style_batch.to(args.device)
                     
+                    content_features = model.encoder(content_batch).detach()
+                    style_features = model.encoder(style_batch).detach()
+                    t = adain(content_features, style_features)
+                    output = model.decoder(t)
+
+                    invert_output = model.encoder(output)
+            
+                    # compute the content loss
+                    assert (t.requires_grad is False)
+                    content_loss = mse_loss(invert_output, t)
+                    
+                    # compute the style loss
+                    style_loss = 0
+                    for j in range(4):
+                        # Take the accurate layer from the encoder
+                        layer = getattr(model.encoder, 'encoder_{:d}'.format(j + 1))
+                        style_batch = layer(style_batch).detach()
+                        output = layer(output)  
+                        assert(style_batch.requires_grad is False)
+                        meanS, stdS = calc_mean_std(style_batch)
+                        meanG, stdG = calc_mean_std(output)
+                        style_loss +=  mse_loss(meanS, meanG) + mse_loss(stdS, stdG)
+                
+                    decoder_loss = content_loss + args.style_weight * style_loss
+                    
+                    if i == 0:
+                        print('Epoch: ',epoch, 'Valid Content loss: ', content_loss.item(), 'Valid Style loss: ', style_loss.item(), 
+                            'Valid Total loss: ', decoder_loss.item())
+                    # Logging to Weights and Biases
+                    if (args.wandb):
+                        wandb.log({'Valid content loss': content_loss.item(), 'Valid style loss': style_loss.item(),
+                                'Valid overall loss': decoder_loss.item()}, step=(epoch*len_data+i))
+                    
                 
                 if args.show_prediction and i == 0:
                     styled_images = model(content_batch, style_batch)
                     
+                    content_img = content_batch[0].detach().cpu().numpy().transpose(1, 2, 0)
+                    content_img = np.clip(content_img, 0, 1)  # Ensure the image is in the 0-1 range
+                    
+                    style_img = style_batch[0].detach().cpu().numpy().transpose(1, 2, 0)
+                    style_img = np.clip(style_img, 0, 1)  # Ensure the image is in the 0-1 range
+                    
                     # Display the styled images
                     styled_img = styled_images[0].detach().cpu().numpy().transpose(1, 2, 0)
                     styled_img = np.clip(styled_img, 0, 1)  # Ensure the image is in the 0-1 range
-                    plt.imshow(styled_img)
-                    plt.show()
+                    
+                    fig, ax = plt.subplots(1, 3, figsize=(15, 5))
+                    ax[0].imshow(content_img)
+                    ax[0].set_title('Content Image')
+                    ax[0].axis('off')
+                    ax[1].imshow(style_img)
+                    ax[1].set_title('Style Image')
+                    ax[1].axis('off')
+                    ax[2].imshow(styled_img)
+                    ax[2].set_title('Model output')
+                    ax[2].axis('off')
+                    fig.savefig('results/Images_{:d}.png'.format(epoch))
     if args.wandb:
         wandb.finish()
     
@@ -154,8 +204,8 @@ if __name__ == '__main__':
     parser.add_argument('--style_weight', type=float, default=10, help='Style weight')
 
     parser.add_argument('--show_prediction', action='store_true', help='Display the styled images')
-    parser.add_argument('--test_content_imgs', type=str, default=None, help='Path to the test content images')
-    parser.add_argument('--test_style_imgs', type=str, default=None, help='Path to the test style images')
+    parser.add_argument('--test_content_imgs', type=str, default='data/val2017', help='Path to the test content images')
+    parser.add_argument('--test_style_imgs', type=str, default='data/wikiart_small', help='Path to the test style images')
     parser.add_argument('--model_name', type=str, default='model.pth', help='Path to save the trained model')
     
     parser.add_argument('--skipco', action='store_true', help='Use skip connections in the decoder')
