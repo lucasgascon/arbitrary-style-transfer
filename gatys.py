@@ -20,11 +20,13 @@ style_layers_default = ['conv_1', 'conv_2', 'conv_3', 'conv_4', 'conv_5']
 """Utils for Gatys Style Transfer
 """
 
+
 def image_loader(loader, image_name, device):
     image = Image.open(image_name)
     # fake batch dimension required to fit network's input dimensions
     image = loader(image).unsqueeze(0)
     return image.to(device, torch.float)
+
 
 def imshow(ax, tensor, unloader, title=None):
     image = tensor.cpu().clone()  # we clone the tensor to not do changes on it
@@ -34,7 +36,8 @@ def imshow(ax, tensor, unloader, title=None):
     if title is not None:
         ax.set_title(title)
     ax.axis('off')
-    
+
+
 def gram_matrix(input):
     a, b, c, d = input.size()  # a=batch size(=1)
     # b=number of feature maps
@@ -47,6 +50,7 @@ def gram_matrix(input):
     # we 'normalize' the values of the gram matrix
     # by dividing by the number of element in each feature maps.
     return G.div(a * b * c * d)
+
 
 def get_style_model_and_losses(cnn, normalization_mean, normalization_std,
                                style_img, content_img,
@@ -80,7 +84,8 @@ def get_style_model_and_losses(cnn, normalization_mean, normalization_std,
         elif isinstance(layer, nn.BatchNorm2d):
             name = 'bn_{}'.format(i)
         else:
-            raise RuntimeError('Unrecognized layer: {}'.format(layer.__class__.__name__))
+            raise RuntimeError('Unrecognized layer: {}'.format(
+                layer.__class__.__name__))
 
         model.add_module(name, layer)
 
@@ -106,9 +111,11 @@ def get_style_model_and_losses(cnn, normalization_mean, normalization_std,
     model = model[:(i + 1)]
 
     return model, style_losses, content_losses
-    
+
+
 """Losses for Gatys Style Transfer
 """
+
 
 class ContentLoss(nn.Module):
 
@@ -123,7 +130,8 @@ class ContentLoss(nn.Module):
     def forward(self, input):
         self.loss = F.mse_loss(input, self.target)
         return input
-    
+
+
 class StyleLoss(nn.Module):
 
     def __init__(self, target_feature):
@@ -134,9 +142,12 @@ class StyleLoss(nn.Module):
         G = gram_matrix(input)
         self.loss = F.mse_loss(G, self.target)
         return input
-    
+
+
 """Model and training functions for Gatys Style Transfer
 """
+
+
 class Normalization(nn.Module):
     def __init__(self, mean, std):
         super(Normalization, self).__init__()
@@ -149,11 +160,13 @@ class Normalization(nn.Module):
     def forward(self, img):
         # normalize ``img``
         return (img - self.mean) / self.std
-    
+
+
 def get_input_optimizer(input_img):
     # this line to show that input is a parameter that requires a gradient
     optimizer = optim.LBFGS([input_img])
     return optimizer
+
 
 def run_style_transfer(cnn, normalization_mean, normalization_std,
                        content_img, style_img, input_img, num_steps=300,
@@ -161,7 +174,7 @@ def run_style_transfer(cnn, normalization_mean, normalization_std,
     """Run the style transfer."""
     print('Building the style transfer model..')
     model, style_losses, content_losses = get_style_model_and_losses(cnn,
-        normalization_mean, normalization_std, style_img, content_img)
+                                                                     normalization_mean, normalization_std, style_img, content_img)
 
     # We want to optimize the input and not the model parameters so we
     # update all the requires_grad fields accordingly
@@ -214,8 +227,3 @@ def run_style_transfer(cnn, normalization_mean, normalization_std,
         input_img.clamp_(0, 1)
 
     return input_img
-
-
-    
-
-
