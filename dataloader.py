@@ -5,6 +5,10 @@ from torchvision import transforms
 import cv2
 import numpy as np
 
+# Define the statistics used for normalization (ImageNet stats)
+stats = ((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+
+
 
 class CustomDataset(Dataset):
     def __init__(self, root_dir, transform=None):
@@ -49,12 +53,14 @@ def create_dataloader(content_path, style_path, trainset, batch_size=1, shuffle=
             # Since OpenCV images are NumPy arrays, convert to PIL Image first
             transforms.ToPILImage(),
             transforms.RandomCrop(256),
-            transforms.ToTensor()
+            transforms.ToTensor(),
+            transforms.Normalize(*stats, inplace = True)
         ])
     else:
         transform = transforms.Compose([
             transforms.ToPILImage(),
-            transforms.ToTensor()
+            transforms.ToTensor(),
+            transforms.Normalize(*stats, inplace = True)
         ])
 
     content_dataset = CustomDataset(content_path, transform=transform)

@@ -7,6 +7,8 @@ from style_transfer_net import StyleTransferNet, adain, calc_mean_std
 from dataloader import create_dataloader
 from torchvision import transforms
 import cv2
+from utils import vizualize_preds
+from dataloader import stats
 
 def load_one_img(img_path):
     
@@ -101,32 +103,12 @@ def test(args):
                     t = adain(content_features, style_features)
                     styled_img = model.decoder(t)
 
-                    content_img = content_img.detach(
-                    ).cpu().numpy().transpose(1, 2, 0)
-                    # Ensure the image is in the 0-1 range
-                    content_img = np.clip(content_img, 0, 1)
+                    print('Displaying the styled images')
+                    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+                    content_img = normalize(transforms.ToTensor(content_img))
+                    style_img = normalize(transforms.ToTensor(style_img))
 
-                    style_img = style_img.detach(
-                    ).cpu().numpy().transpose(1, 2, 0)
-                    # Ensure the image is in the 0-1 range
-                    style_img = np.clip(style_img, 0, 1)
-
-                    # Display the styled images
-                    styled_img = styled_img.detach(
-                    ).cpu().numpy().transpose(1, 2, 0)
-                    # Ensure the image is in the 0-1 range
-                    styled_img = np.clip(styled_img, 0, 1)
-
-                    fig, ax = plt.subplots(1, 3, figsize=(15, 5))
-                    ax[0].imshow(content_img)
-                    ax[0].set_title('Content Image')
-                    ax[0].axis('off')
-                    ax[1].imshow(style_img)
-                    ax[1].set_title('Style Image')
-                    ax[1].axis('off')
-                    ax[2].imshow(styled_img)
-                    ax[2].set_title('Model output')
-                    ax[2].axis('off')
+                    fig, ax = vizualize_preds(content_img, style_img, styled_img)
                     fig.savefig('results/Images_test_'+'model_name'+'.png')
                     plt.show()
 

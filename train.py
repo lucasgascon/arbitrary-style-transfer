@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import wandb
 import copy
+from utils import vizualize_preds
 
 # torch.autograd.set_detect_anomaly(True)
 
@@ -65,7 +66,17 @@ def train(args):
     mse_loss = torch.nn.MSELoss()
 
     model.to(args.device)
+    
+    # # Check encoder freeze:
+    # for param in model.encoder.parameters():
+    #     print('Encoder parameters: ', param.requires_grad)
+    #     assert (param.requires_grad is False)
+        
+    # # Check decoder unfreeze:
+    # for param in model.decoder.parameters():
+    #     print('Decoder parameters: ', param.requires_grad)
 
+    
     count = 0
     for epoch in range(args.n_epochs):
         model.train()
@@ -82,7 +93,7 @@ def train(args):
             styled_images = model.decoder(t)
             output = styled_images
             invert_output = model.encoder(output)
-
+            
             # compute the content loss
             assert (t.requires_grad is False)
             content_loss = mse_loss(invert_output, t)
@@ -100,11 +111,11 @@ def train(args):
                 style_loss += mse_loss(meanS, meanG) + mse_loss(stdS, stdG)
 
             decoder_loss = content_loss + args.style_weight * style_loss
-            
+            # print(model.decoder.decoder_3._modules['2'].weight.grad)
             optimizer.zero_grad()
             decoder_loss.backward()
             optimizer.step()
-           
+        
 
             if i == 0:
                 print('Epoch: ', epoch, 'Content loss: ', content_loss.item(), 'Style loss: ', style_loss.item(),
@@ -113,6 +124,7 @@ def train(args):
             if (args.wandb):
                 wandb.log({'Train content Loss': content_loss.item(), ' Train style loss': style_loss.item(),
                            'Train overall Loss': decoder_loss.item()})
+      
             count += 1
         if args.test :
             model.eval()
@@ -166,35 +178,10 @@ def train(args):
                 pass
                     
         if args.show_prediction:
-                print('Displaying the styled images')
+                    print('Displaying the styled images')
+                    fig, ax = vizualize_preds(content_imgs[0], style_imgs[0], styled_images[0])
+                    fig.savefig('results/Images_+'+args.model_name+'_{:d}.png'.format(epoch))
 
-                content_img = content_imgs[0].detach(
-                ).cpu().numpy().transpose(1, 2, 0)
-                # Ensure the image is in the 0-1 range
-                content_img = np.clip(content_img, 0, 1)
-
-                style_img = style_imgs[0].detach(
-                ).cpu().numpy().transpose(1, 2, 0)
-                # Ensure the image is in the 0-1 range
-                style_img = np.clip(style_img, 0, 1)
-
-                # Display the styled images
-                styled_img = styled_images[0].detach(
-                ).cpu().numpy().transpose(1, 2, 0)
-                # Ensure the image is in the 0-1 range
-                styled_img = np.clip(styled_img, 0, 1)
-
-                fig, ax = plt.subplots(1, 3, figsize=(15, 5))
-                ax[0].imshow(content_img)
-                ax[0].set_title('Content Image')
-                ax[0].axis('off')
-                ax[1].imshow(style_img)
-                ax[1].set_title('Style Image')
-                ax[1].axis('off')
-                ax[2].imshow(styled_img)
-                ax[2].set_title('Model output')
-                ax[2].axis('off')
-                fig.savefig('results/Images_{:d}.png'.format(epoch))
 
         if epoch % args.save_model_interval == 0:
             state_dict = model.decoder.state_dict()
@@ -220,7 +207,7 @@ if __name__ == '__main__':
                         help="wandb username or team name to which runs are attributed"
                         )
     parser.add_argument('--n_epochs', type=int,
-                        default=100, help='Number of epochs')
+                        default=10, help='Number of epochs')
     parser.add_argument('--save_model_interval', type=int, default=2)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     parser.add_argument('--device', type=str, default=device,
@@ -232,7 +219,7 @@ if __name__ == '__main__':
     parser.add_argument('--test', action='store_true', help='Test the model')
 
     parser.add_argument('--batch_size', type=int, default=8, help='Batch size')
-    parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
+    parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
     parser.add_argument('--lr_decay', type=float, default=5e-5)
     parser.add_argument('--epsilon', type=float,
                         default=1e-8, help='Epsilon value')
