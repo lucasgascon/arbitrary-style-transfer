@@ -165,7 +165,11 @@ def train(args):
                 pass
                     
         if args.show_prediction:
-            styled_images = model(content_batch, style_batch)
+            
+            content_features = model.encoder(content_batch)
+            style_features = model.encoder(style_batch)
+            t = adain(content_features, style_features)
+            styled_images = model.decoder(t)
 
             content_img = content_batch[0].detach(
             ).cpu().numpy().transpose(1, 2, 0)
