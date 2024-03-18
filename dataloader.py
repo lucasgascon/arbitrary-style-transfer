@@ -1,7 +1,9 @@
 import os
-import cv2
+import torch
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
+import cv2
+import numpy as np
 
 
 class CustomDataset(Dataset):
@@ -12,12 +14,19 @@ class CustomDataset(Dataset):
 
     def __len__(self):
         return len(self.image_files)
+    
+
 
     def __getitem__(self, idx):
         img_path = os.path.join(self.root_dir, self.image_files[idx])
 
         img = cv2.imread(img_path)
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        if img is None:
+            print(f"Error reading {img_path}")
+            img = np.zeros((512, 512, 3), dtype=np.uint8)
+        else:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+      
 
         h, w, _ = img.shape
         if h < w:
@@ -28,9 +37,9 @@ class CustomDataset(Dataset):
             new_h = int(h * (512 / w))
         img = cv2.resize(img, (new_w, new_h))
 
+
         if self.transform is not None:
             img = self.transform(img)
-
         return img
 
 

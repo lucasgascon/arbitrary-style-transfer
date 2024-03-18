@@ -49,9 +49,15 @@ def train(args):
     if args.test:
         content_testloader, style_testloader = create_dataloader(
             args.test_content_imgs, args.test_style_imgs, trainset=False, batch_size=1, shuffle=False)
+    print('Data loaded successfully')
+    print('Content train images: ', len(content_trainloader)*args.batch_size) 
+    print('Style train images: ', len(style_trainloader)*args.batch_size)
+    if args.test:   
+        print('Content test images: ', len(content_testloader))
+        print('Style test images: ', len(style_testloader)) 
 
     len_data = min(len(content_trainloader), len(style_trainloader))
-    model = StyleTransferNet(args.skipco, args.alpha).to(args.device)
+    model = StyleTransferNet(args.skipco, args.alpha)
 
     optimizer = torch.optim.Adam(model.decoder.parameters(), lr=args.lr)
 
@@ -59,17 +65,18 @@ def train(args):
 
     model.to(args.device)
 
+    count = 0
     for epoch in range(args.n_epochs):
         model.train()
         for i, (content_batch, style_batch) in tqdm(enumerate(zip(content_trainloader, style_trainloader))):
-            adjust_learning_rate(optimizer, args.lr,
-                                 args.lr_decay, (epoch*len_data+i))
-            optimizer.zero_grad()
+            # adjust_learning_rate(optimizer, args.lr,
+            #                      args.lr_decay, count)
+       
             content_batch = content_batch.to(args.device)
             style_batch = style_batch.to(args.device)
 
-            content_features = model.encoder(content_batch).detach()
-            style_features = model.encoder(style_batch).detach()
+            content_features = model.encoder(content_batch)
+            style_features = model.encoder(style_batch)
             t = adain(content_features, style_features)
             output = model.decoder(t)
 
@@ -84,7 +91,7 @@ def train(args):
             for j in range(4):
                 # Take the accurate layer from the encoder
                 layer = getattr(model.encoder, 'encoder_{:d}'.format(j + 1))
-                style_batch = layer(style_batch).detach()
+                style_batch = layer(style_batch)
                 output = layer(output)
                 assert (style_batch.requires_grad is False)
                 meanS, stdS = calc_mean_std(style_batch)
@@ -92,6 +99,10 @@ def train(args):
                 style_loss += mse_loss(meanS, meanG) + mse_loss(stdS, stdG)
 
             decoder_loss = content_loss + args.style_weight * style_loss
+            
+            optimizer.zero_grad()
+            decoder_loss.backward()
+            optimizer.step()
 
             if i == 0:
                 print('Epoch: ', epoch, 'Content loss: ', content_loss.item(), 'Style loss: ', style_loss.item(),
@@ -99,94 +110,100 @@ def train(args):
             # Logging to Weights and Biases
             if (args.wandb):
                 wandb.log({'Train content Loss': content_loss.item(), ' Train style loss': style_loss.item(),
-                           'Train overall Loss': decoder_loss.item()}, step=(epoch*len_data+i))
-
-            if (epoch*len_data+i) % args.save_model_interval == 0:
-                state_dict = model.decoder.state_dict()
-                for key in state_dict.keys():
-                    state_dict[key] = state_dict[key].to(torch.device('cpu'))
-                torch.save(state_dict, 'models/'+args.model_name +
-                           'decoder_epoch_{:d}.pth.tar'.format(epoch))
-
-            decoder_loss.backward()
-            optimizer.step()
-
-        if args.test and epoch % 2 == 0:
+                           'Train overall Loss': decoder_loss.item()})
+            count += 1
+        if args.test :
             model.eval()
-            eval_decoder_loss = []
-            eval_content_loss = []
-            eval_style_loss = []
-            with torch.no_grad():
-                for content_batch, style_batch in zip(content_testloader, style_testloader):
-                    content_batch = content_batch.to(args.device)
-                    style_batch = style_batch.to(args.device)
+            print('Validating the model')
+            try:
+                eval_decoder_loss = []
+                eval_content_loss = []
+                eval_style_loss = []
+                with torch.no_grad():
+                    for content_batch, style_batch in zip(content_testloader, style_testloader):
+                        content_batch = content_batch.to(args.device)
+                        style_batch = style_batch.to(args.device)
 
-                    content_features = model.encoder(content_batch).detach()
-                    style_features = model.encoder(style_batch).detach()
-                    t = adain(content_features, style_features)
-                    output = model.decoder(t)
+                        content_features = model.encoder(content_batch)
+                        style_features = model.encoder(style_batch)
+                        t = adain(content_features, style_features)
+                        output = model.decoder(t)
 
-                    invert_output = model.encoder(output)
+                        invert_output = model.encoder(output)
 
-                    # compute the content loss
-                    assert (t.requires_grad is False)
-                    content_loss = mse_loss(invert_output, t)
+                        # compute the content loss
+                        assert (t.requires_grad is False)
+                        content_loss = mse_loss(invert_output, t)
 
-                    # compute the style loss
-                    style_loss = 0
-                    for j in range(4):
-                        # Take the accurate layer from the encoder
-                        layer = getattr(
-                            model.encoder, 'encoder_{:d}'.format(j + 1))
-                        style_batch = layer(style_batch).detach()
-                        output = layer(output)
-                        assert (style_batch.requires_grad is False)
-                        meanS, stdS = calc_mean_std(style_batch)
-                        meanG, stdG = calc_mean_std(output)
-                        style_loss += mse_loss(meanS, meanG) + \
-                            mse_loss(stdS, stdG)
-                    decoder_loss = content_loss + args.style_weight * style_loss
-                    eval_decoder_loss.append(decoder_loss.item())
-                    eval_content_loss.append(content_loss.item)
-                    eval_style_loss.append(style_loss.item)
+                        # compute the style loss
+                        style_loss = 0
+                        for j in range(4):
+                            # Take the accurate layer from the encoder
+                            layer = getattr(
+                                model.encoder, 'encoder_{:d}'.format(j + 1))
+                            style_batch = layer(style_batch).detach()
+                            output = layer(output)
+                            assert (style_batch.requires_grad is False)
+                            meanS, stdS = calc_mean_std(style_batch)
+                            meanG, stdG = calc_mean_std(output)
+                            style_loss += mse_loss(meanS, meanG) + \
+                                mse_loss(stdS, stdG)
+                        decoder_loss = content_loss + args.style_weight * style_loss
+                        eval_decoder_loss.append(decoder_loss.item())
+                        eval_content_loss.append(content_loss.item)
+                        eval_style_loss.append(style_loss.item)
 
-                print('Epoch: ', epoch, 'Valid Content loss: ', eval_content_loss.mean(), 'Valid Style loss: ', eval_style_loss.mean(),
-                      'Valid Total loss: ', eval_decoder_loss.mean())
-                # Logging to Weights and Biases
-                if (args.wandb):
-                    wandb.log({'Valid content loss': content_loss.item(), 'Valid style loss': style_loss.item(),
-                               'Valid overall loss': decoder_loss.item()}, step=(epoch*len_data+i))
+                    print('Epoch: ', epoch, 'Valid Content loss: ', eval_content_loss.mean(), 'Valid Style loss: ', eval_style_loss.mean(),
+                        'Valid Total loss: ', eval_decoder_loss.mean())
+                    
+                    # Logging to Weights and Biases
+                    if (args.wandb):
+                        wandb.log({'Valid content loss': content_loss.item(), 'Valid style loss': style_loss.item(),
+                                'Valid overall loss': decoder_loss.item()})
+            except:
+                print("Error in validation")
+                pass
+                    
+        if args.show_prediction:
+            styled_images = model(content_batch, style_batch)
 
-                if args.show_prediction:
-                    styled_images = model(content_batch, style_batch)
+            content_img = content_batch[0].detach(
+            ).cpu().numpy().transpose(1, 2, 0)
+            # Ensure the image is in the 0-1 range
+            content_img = np.clip(content_img, 0, 1)
 
-                    content_img = content_batch[0].detach(
-                    ).cpu().numpy().transpose(1, 2, 0)
-                    # Ensure the image is in the 0-1 range
-                    content_img = np.clip(content_img, 0, 1)
+            style_img = style_batch[0].detach(
+            ).cpu().numpy().transpose(1, 2, 0)
+            # Ensure the image is in the 0-1 range
+            style_img = np.clip(style_img, 0, 1)
 
-                    style_img = style_batch[0].detach(
-                    ).cpu().numpy().transpose(1, 2, 0)
-                    # Ensure the image is in the 0-1 range
-                    style_img = np.clip(style_img, 0, 1)
+            # Display the styled images
+            styled_img = styled_images[0].detach(
+            ).cpu().numpy().transpose(1, 2, 0)
+            # Ensure the image is in the 0-1 range
+            styled_img = np.clip(styled_img, 0, 1)
 
-                    # Display the styled images
-                    styled_img = styled_images[0].detach(
-                    ).cpu().numpy().transpose(1, 2, 0)
-                    # Ensure the image is in the 0-1 range
-                    styled_img = np.clip(styled_img, 0, 1)
+            fig, ax = plt.subplots(1, 3, figsize=(15, 5))
+            ax[0].imshow(content_img)
+            ax[0].set_title('Content Image')
+            ax[0].axis('off')
+            ax[1].imshow(style_img)
+            ax[1].set_title('Style Image')
+            ax[1].axis('off')
+            ax[2].imshow(styled_img)
+            ax[2].set_title('Model output')
+            ax[2].axis('off')
+            fig.savefig('results/Images_{:d}.png'.format(epoch))
 
-                    fig, ax = plt.subplots(1, 3, figsize=(15, 5))
-                    ax[0].imshow(content_img)
-                    ax[0].set_title('Content Image')
-                    ax[0].axis('off')
-                    ax[1].imshow(style_img)
-                    ax[1].set_title('Style Image')
-                    ax[1].axis('off')
-                    ax[2].imshow(styled_img)
-                    ax[2].set_title('Model output')
-                    ax[2].axis('off')
-                    fig.savefig('results/Images_{:d}.png'.format(epoch))
+        if epoch % args.save_model_interval == 0:
+            state_dict = model.decoder.state_dict()
+            for key in state_dict.keys():
+                state_dict[key] = state_dict[key].to(torch.device('cpu'))
+            torch.save(state_dict, 'models/'+args.model_name +
+                        'decoder_epoch_{:d}.pth.tar'.format(epoch))
+
+
+
 
     if args.wandb:
         wandb.finish()
@@ -203,14 +220,14 @@ if __name__ == '__main__':
                         )
     parser.add_argument('--n_epochs', type=int,
                         default=100, help='Number of epochs')
-    parser.add_argument('--save_model_interval', type=int, default=10000)
+    parser.add_argument('--save_model_interval', type=int, default=2)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     parser.add_argument('--device', type=str, default=device,
                         help='Device to train the model')
     parser.add_argument('--train_content_imgs', type=str,
-                        default='data/val2017', help='Path to the training content images')
+                        default='data/40Ktrain', help='Path to the training content images')
     parser.add_argument('--train_style_imgs', type=str,
-                        default='data/wikiart', help='Path to the training style images')
+                        default='data/20Kwikiart', help='Path to the training style images')
     parser.add_argument('--test', action='store_true', help='Test the model')
 
     parser.add_argument('--batch_size', type=int, default=8, help='Batch size')
@@ -225,7 +242,7 @@ if __name__ == '__main__':
     parser.add_argument('--show_prediction', action='store_true',
                         help='Display the styled images')
     parser.add_argument('--test_content_imgs', type=str,
-                        default='data/test2017', help='Path to the test content images')
+                        default='data/val2017', help='Path to the test content images')
     parser.add_argument('--test_style_imgs', type=str,
                         default='data/wikiart_small', help='Path to the test style images')
     parser.add_argument('--model_name', type=str,
@@ -233,7 +250,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--skipco', action='store_true',
                         help='Use skip connections in the decoder')
-    parser.add_argument('--alpha', type=float, default=1,
+    parser.add_argument('--alpha', type=float, default=1.,
                         help='Alpha value for style/content tradeoff')
 
     args = parser.parse_args()

@@ -4,11 +4,6 @@ from torchvision.models import vgg19, VGG19_Weights
 
 
 def calc_mean_std(x):
-    # batch_size, num_channels, h, w = x.size()
-    # x_view = x.view(batch_size, num_channels, -1)
-    # mean_ = x_view.mean(dim=2).view(batch_size, num_channels, 1, 1)
-    # std_ = x_view.std(dim=2).view(batch_size, num_channels, 1, 1)
-
     mean_ = torch.mean(x, dim=[2, 3], keepdim=True)
     std_ = torch.std(x, dim=[2, 3], keepdim=True)
     return mean_, std_
@@ -146,18 +141,18 @@ class StyleTransferNet(nn.Module):
 
     def forward(self, content, style):
 
-        content_1 = self.encoder.encoder_1(content).detach()  # 64 channels
-        content_2 = self.encoder.encoder_2(content_1).detach()  # 128 channels
-        content_3 = self.encoder.encoder_3(content_2).detach()  # 256 channels
-        content_4 = self.encoder.encoder_4(content_3).detach()  # 512 channels
+        content_1 = self.encoder.encoder_1(content)  # 64 channels
+        content_2 = self.encoder.encoder_2(content_1)  # 128 channels
+        content_3 = self.encoder.encoder_3(content_2)  # 256 channels
+        content_4 = self.encoder.encoder_4(content_3)  # 512 channels
 
-        style_1 = self.encoder.encoder_1(style).detach()
-        style_2 = self.encoder.encoder_2(style_1).detach()
-        style_3 = self.encoder.encoder_3(style_2).detach()
-        style_4 = self.encoder.encoder_4(style_3).detach()
+        style_1 = self.encoder.encoder_1(style)
+        style_2 = self.encoder.encoder_2(style_1)
+        style_3 = self.encoder.encoder_3(style_2)
+        style_4 = self.encoder.encoder_4(style_3)
 
         # Style/ content trade-off
-        t = adain(content_4, style_4).detach()
+        t = adain(content_4, style_4)
         t = self.alpha * t + (1 - self.alpha) * content_4
 
         # Input is 512 channels and output is 256 channels
