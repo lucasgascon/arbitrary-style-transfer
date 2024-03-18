@@ -7,8 +7,9 @@ import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 import wandb
+import copy
 
-torch.autograd.set_detect_anomaly(True)
+# torch.autograd.set_detect_anomaly(True)
 
 
 def adjust_learning_rate(optimizer, lr, lr_decay, iteration_count):
@@ -68,18 +69,18 @@ def train(args):
     count = 0
     for epoch in range(args.n_epochs):
         model.train()
-        for i, (content_batch, style_batch) in tqdm(enumerate(zip(content_trainloader, style_trainloader))):
-            # adjust_learning_rate(optimizer, args.lr,
-            #                      args.lr_decay, count)
+        for i, (content_imgs, style_imgs) in tqdm(enumerate(zip(content_trainloader, style_trainloader))):
+            adjust_learning_rate(optimizer, args.lr,
+                                 args.lr_decay, count)
        
-            content_batch = content_batch.to(args.device)
-            style_batch = style_batch.to(args.device)
+            content_batch = content_imgs.to(args.device)
+            style_batch = style_imgs.to(args.device)
 
             content_features = model.encoder(content_batch)
             style_features = model.encoder(style_batch)
             t = adain(content_features, style_features)
-            output = model.decoder(t)
-
+            styled_images = model.decoder(t)
+            output = styled_images
             invert_output = model.encoder(output)
 
             # compute the content loss
@@ -103,6 +104,7 @@ def train(args):
             optimizer.zero_grad()
             decoder_loss.backward()
             optimizer.step()
+           
 
             if i == 0:
                 print('Epoch: ', epoch, 'Content loss: ', content_loss.item(), 'Style loss: ', style_loss.item(),
@@ -120,15 +122,15 @@ def train(args):
                 eval_content_loss = []
                 eval_style_loss = []
                 with torch.no_grad():
-                    for content_batch, style_batch in zip(content_testloader, style_testloader):
-                        content_batch = content_batch.to(args.device)
-                        style_batch = style_batch.to(args.device)
+                    for content_imgs, style_imgs in zip(content_testloader, style_testloader):
+                        content_batch = content_imgs.to(args.device)
+                        style_batch = style_imgs.to(args.device)
 
                         content_features = model.encoder(content_batch)
                         style_features = model.encoder(style_batch)
                         t = adain(content_features, style_features)
-                        output = model.decoder(t)
-
+                        styled_images = model.decoder(t)
+                        output = styled_images
                         invert_output = model.encoder(output)
 
                         # compute the content loss
@@ -139,15 +141,14 @@ def train(args):
                         style_loss = 0
                         for j in range(4):
                             # Take the accurate layer from the encoder
-                            layer = getattr(
-                                model.encoder, 'encoder_{:d}'.format(j + 1))
-                            style_batch = layer(style_batch).detach()
+                            layer = getattr(model.encoder, 'encoder_{:d}'.format(j + 1))
+                            style_batch = layer(style_batch)
                             output = layer(output)
                             assert (style_batch.requires_grad is False)
                             meanS, stdS = calc_mean_std(style_batch)
                             meanG, stdG = calc_mean_std(output)
-                            style_loss += mse_loss(meanS, meanG) + \
-                                mse_loss(stdS, stdG)
+                            style_loss += mse_loss(meanS, meanG) + mse_loss(stdS, stdG)
+
                         decoder_loss = content_loss + args.style_weight * style_loss
                         eval_decoder_loss.append(decoder_loss.item())
                         eval_content_loss.append(content_loss.item)
@@ -165,39 +166,35 @@ def train(args):
                 pass
                     
         if args.show_prediction:
-            
-            content_features = model.encoder(content_batch)
-            style_features = model.encoder(style_batch)
-            t = adain(content_features, style_features)
-            styled_images = model.decoder(t)
+                print('Displaying the styled images')
 
-            content_img = content_batch[0].detach(
-            ).cpu().numpy().transpose(1, 2, 0)
-            # Ensure the image is in the 0-1 range
-            content_img = np.clip(content_img, 0, 1)
+                content_img = content_imgs[0].detach(
+                ).cpu().numpy().transpose(1, 2, 0)
+                # Ensure the image is in the 0-1 range
+                content_img = np.clip(content_img, 0, 1)
 
-            style_img = style_batch[0].detach(
-            ).cpu().numpy().transpose(1, 2, 0)
-            # Ensure the image is in the 0-1 range
-            style_img = np.clip(style_img, 0, 1)
+                style_img = style_imgs[0].detach(
+                ).cpu().numpy().transpose(1, 2, 0)
+                # Ensure the image is in the 0-1 range
+                style_img = np.clip(style_img, 0, 1)
 
-            # Display the styled images
-            styled_img = styled_images[0].detach(
-            ).cpu().numpy().transpose(1, 2, 0)
-            # Ensure the image is in the 0-1 range
-            styled_img = np.clip(styled_img, 0, 1)
+                # Display the styled images
+                styled_img = styled_images[0].detach(
+                ).cpu().numpy().transpose(1, 2, 0)
+                # Ensure the image is in the 0-1 range
+                styled_img = np.clip(styled_img, 0, 1)
 
-            fig, ax = plt.subplots(1, 3, figsize=(15, 5))
-            ax[0].imshow(content_img)
-            ax[0].set_title('Content Image')
-            ax[0].axis('off')
-            ax[1].imshow(style_img)
-            ax[1].set_title('Style Image')
-            ax[1].axis('off')
-            ax[2].imshow(styled_img)
-            ax[2].set_title('Model output')
-            ax[2].axis('off')
-            fig.savefig('results/Images_{:d}.png'.format(epoch))
+                fig, ax = plt.subplots(1, 3, figsize=(15, 5))
+                ax[0].imshow(content_img)
+                ax[0].set_title('Content Image')
+                ax[0].axis('off')
+                ax[1].imshow(style_img)
+                ax[1].set_title('Style Image')
+                ax[1].axis('off')
+                ax[2].imshow(styled_img)
+                ax[2].set_title('Model output')
+                ax[2].axis('off')
+                fig.savefig('results/Images_{:d}.png'.format(epoch))
 
         if epoch % args.save_model_interval == 0:
             state_dict = model.decoder.state_dict()
