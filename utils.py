@@ -14,12 +14,17 @@ def unnormalize(images, means, stds):
 
     return images * stds + means 
 
-def vizualize_preds(content_img, style_img, styled_img):
+def vizualize_preds(content_img, style_img, styled_img, normalize = True):
     
-
-    content_img = unnormalize(content_img.detach().cpu(),*stats)
-    style_img = unnormalize(style_img.detach().cpu(),*stats)
-    styled_img = unnormalize(styled_img.detach().cpu(),*stats)
+    if normalize:
+        content_img = unnormalize(content_img.detach().cpu(),*stats)
+        style_img = unnormalize(style_img.detach().cpu(),*stats)
+        # styled_img = unnormalize(styled_img.detach().cpu(),*stats)
+        styled_img = styled_img.detach().cpu()
+    else :
+        content_img = content_img.detach().cpu()
+        style_img = style_img.detach().cpu()
+        styled_img = styled_img.detach().cpu()
 
 
     fig, ax = plt.subplots(1, 3, figsize=(15, 5))

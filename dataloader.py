@@ -47,21 +47,35 @@ class CustomDataset(Dataset):
         return img
 
 
-def create_dataloader(content_path, style_path, trainset, batch_size=1, shuffle=True):
-    if trainset:
-        transform = transforms.Compose([
-            # Since OpenCV images are NumPy arrays, convert to PIL Image first
-            transforms.ToPILImage(),
-            transforms.RandomCrop(256),
-            transforms.ToTensor(),
-            transforms.Normalize(*stats, inplace = True)
-        ])
+def create_dataloader(content_path, style_path, trainset, batch_size=1, shuffle=True, normalize=True):
+    if normalize:
+        if trainset:
+            transform = transforms.Compose([
+                # Since OpenCV images are NumPy arrays, convert to PIL Image first
+                transforms.ToPILImage(),
+                transforms.RandomCrop(256),
+                transforms.ToTensor(),
+                transforms.Normalize(*stats, inplace = True)
+            ])
+        else:
+            transform = transforms.Compose([
+                transforms.ToPILImage(),
+                transforms.ToTensor(),
+                transforms.Normalize(*stats, inplace = True)
+            ])
     else:
-        transform = transforms.Compose([
-            transforms.ToPILImage(),
-            transforms.ToTensor(),
-            transforms.Normalize(*stats, inplace = True)
-        ])
+        if trainset:
+            transform = transforms.Compose([
+                # Since OpenCV images are NumPy arrays, convert to PIL Image first
+                transforms.ToPILImage(),
+                transforms.RandomCrop(256),
+                transforms.ToTensor(),
+            ])
+        else:
+            transform = transforms.Compose([
+                transforms.ToPILImage(),
+                transforms.ToTensor(),
+            ])
 
     content_dataset = CustomDataset(content_path, transform=transform)
     content_dataloader = DataLoader(

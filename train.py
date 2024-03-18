@@ -47,10 +47,10 @@ def train(args):
         }
 
     content_trainloader, style_trainloader = create_dataloader(
-        args.train_content_imgs, args.train_style_imgs, trainset=True, batch_size=args.batch_size, shuffle=True)
+        args.train_content_imgs, args.train_style_imgs, trainset=True, batch_size=args.batch_size, shuffle=True, normalize=args.normalize)
     if args.test:
         content_testloader, style_testloader = create_dataloader(
-            args.test_content_imgs, args.test_style_imgs, trainset=False, batch_size=1, shuffle=False)
+            args.test_content_imgs, args.test_style_imgs, trainset=False, batch_size=1, shuffle=False, normalize=args.normalize)
     print('Data loaded successfully')
     print('Content train images: ', len(content_trainloader)*args.batch_size) 
     print('Style train images: ', len(style_trainloader)*args.batch_size)
@@ -58,7 +58,6 @@ def train(args):
         print('Content test images: ', len(content_testloader))
         print('Style test images: ', len(style_testloader)) 
 
-    len_data = min(len(content_trainloader), len(style_trainloader))
     model = StyleTransferNet(args.skipco, args.alpha)
 
     optimizer = torch.optim.Adam(model.decoder.parameters(), lr=args.lr)
@@ -179,7 +178,7 @@ def train(args):
                     
         if args.show_prediction:
                     print('Displaying the styled images')
-                    fig, ax = vizualize_preds(content_imgs[0], style_imgs[0], styled_images[0])
+                    fig, ax = vizualize_preds(content_imgs[0], style_imgs[0], styled_images[0], normalize = args.normalize)
                     fig.savefig('results/Images_+'+args.model_name+'_{:d}.png'.format(epoch))
 
 
@@ -219,7 +218,7 @@ if __name__ == '__main__':
     parser.add_argument('--test', action='store_true', help='Test the model')
 
     parser.add_argument('--batch_size', type=int, default=8, help='Batch size')
-    parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
+    parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
     parser.add_argument('--lr_decay', type=float, default=5e-5)
     parser.add_argument('--epsilon', type=float,
                         default=1e-8, help='Epsilon value')
@@ -240,6 +239,8 @@ if __name__ == '__main__':
                         help='Use skip connections in the decoder')
     parser.add_argument('--alpha', type=float, default=1.,
                         help='Alpha value for style/content tradeoff')
+    parser.add_argument('--normalize',action="store_true", default=False,
+                        help="Normalize with ImageNet stats")
 
     args = parser.parse_args()
 

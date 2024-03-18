@@ -13,7 +13,6 @@ from dataloader import stats
 def load_one_img(img_path):
     
         img = cv2.imread(img_path)
-        
         transform = transforms.Compose([
             transforms.ToPILImage(),
             transforms.ToTensor()
@@ -105,10 +104,12 @@ def test(args):
 
                     print('Displaying the styled images')
                     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-                    content_img = normalize(transforms.ToTensor(content_img))
-                    style_img = normalize(transforms.ToTensor(style_img))
+                    if args.normalize:
+                        content_img = normalize(transforms.ToTensor(content_img))
+                        style_img = normalize(transforms.ToTensor(style_img))
 
-                    fig, ax = vizualize_preds(content_img, style_img, styled_img)
+
+                    fig, ax = vizualize_preds(content_img, style_img, styled_img, normalize = args.normalize)
                     fig.savefig('results/Images_test_'+'model_name'+'.png')
                     plt.show()
 
@@ -134,5 +135,7 @@ if __name__ == '__main__':
                         help='Use skip connections in the decoder')
     parser.add_argument('--alpha', type=float, default=1,
                         help='Alpha value for style/content tradeoff')
+    parser.add_argument('--normalize',action="store_true", default=False,
+                        help="Normalize with ImageNet stats")
     args = parser.parse_args()
     test(args)
