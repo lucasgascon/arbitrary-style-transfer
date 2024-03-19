@@ -14,7 +14,7 @@ def unnormalize(images, means, stds):
 
     return images * stds + means 
 
-def vizualize_preds(content_img, style_img, styled_img, normalize = True):
+def vizualize_preds(content_img, style_img, styled_img, normalize = False):
     
     if normalize:
         content_img = unnormalize(content_img.detach().cpu(),*stats)

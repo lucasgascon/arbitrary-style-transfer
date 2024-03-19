@@ -222,7 +222,7 @@ if __name__ == '__main__':
                         )
     parser.add_argument('--n_epochs', type=int,
                         default=50, help='Number of epochs')
-    parser.add_argument('--save_model_interval', type=int, default=2)
+    parser.add_argument('--save_model_interval', type=int, default=5)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     parser.add_argument('--device', type=str, default=device,
                         help='Device to train the model')

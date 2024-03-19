@@ -276,23 +276,24 @@ class StyleTransferNet(nn.Module):
         t = adain(content_4, style_4)
         t = self.alpha * t + (1 - self.alpha) * content_4
 
+        
         # Input is 512 channels and output is 256 channels
         g_t = self.decoder.decoder_4(t)
 
         if self.skip_connections:
-            g_t = g_t + content_3
+            g_t = g_t   + content_3
 
         # Input is 256 channels and output is 128 channels
         g_t = self.decoder.decoder_3(g_t)
 
         if self.skip_connections:
-            g_t = g_t + content_2
+            g_t = g_t  + content_2
 
         # Input is 128 channels and output is 64 channels
         g_t = self.decoder.decoder_2(g_t)
 
         if self.skip_connections:
-            g_t = g_t + content_1
+            g_t = g_t  + content_1
 
         # Input is 64 channels and output is 3 channels
         g_t = self.decoder.decoder_1(g_t)
