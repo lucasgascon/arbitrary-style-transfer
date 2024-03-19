@@ -23,6 +23,8 @@ def adjust_learning_rate(optimizer, lr, lr_decay, iteration_count):
 def train(args):
     """Enable to monitor results during training
     """
+    args.model_name = args.model_name + '_skipco_' + str(args.skipco)+ '_normed_vgg_' + str(args.normed_vgg) + '_normalize_' + str(args.normalize) + '_style_weight_' + str(args.style_weight) + '_lr_' + str(args.lr)+ '_alpha_' + str(args.alpha) 
+
     if (args.wandb):
         wandb.init(
             name=args.model_name,
@@ -58,7 +60,7 @@ def train(args):
         print('Content test images: ', len(content_testloader))
         print('Style test images: ', len(style_testloader)) 
 
-    model = StyleTransferNet(args.skipco, args.alpha)
+    model = StyleTransferNet(args.skipco, args.alpha, args.normed_vgg)
 
     optimizer = torch.optim.Adam(model.decoder.parameters(), lr=args.lr)
 
@@ -179,7 +181,7 @@ def train(args):
         if args.show_prediction:
                     print('Displaying the styled images')
                     fig, ax = vizualize_preds(content_imgs[0], style_imgs[0], styled_images[0], normalize = args.normalize)
-                    fig.savefig('results/Images_+'+args.model_name+'_{:d}.png'.format(epoch))
+                    fig.savefig('results/Images_'+args.model_name+'_{:d}.png'.format(epoch))
 
 
         if epoch % args.save_model_interval == 0:
@@ -241,6 +243,8 @@ if __name__ == '__main__':
                         help='Alpha value for style/content tradeoff')
     parser.add_argument('--normalize',action="store_true", default=False,
                         help="Normalize with ImageNet stats")
+    parser.add_argument('--normed_vgg',action="store_true", default=False,
+                        help="Whether to use the VGG model with normalization or not")
 
     args = parser.parse_args()
 

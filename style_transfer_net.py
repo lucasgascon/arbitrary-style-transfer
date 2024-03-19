@@ -16,9 +16,89 @@ def adain(content, style):
     return output
 
 
+
+class Alternative_Encoder(nn.Module):
+    def __init__(self):
+        super(Alternative_Encoder, self).__init__()
+        
+        vgg = nn.Sequential(
+            nn.Conv2d(3, 3, (1, 1)),
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(3, 64, (3, 3)),
+            nn.ReLU(),  # relu1-1
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(64, 64, (3, 3)),
+            nn.ReLU(),  # relu1-2
+            nn.MaxPool2d((2, 2), (2, 2), (0, 0), ceil_mode=True),
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(64, 128, (3, 3)),
+            nn.ReLU(),  # relu2-1
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(128, 128, (3, 3)),
+            nn.ReLU(),  # relu2-2
+            nn.MaxPool2d((2, 2), (2, 2), (0, 0), ceil_mode=True),
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(128, 256, (3, 3)),
+            nn.ReLU(),  # relu3-1
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(256, 256, (3, 3)),
+            nn.ReLU(),  # relu3-2
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(256, 256, (3, 3)),
+            nn.ReLU(),  # relu3-3
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(256, 256, (3, 3)),
+            nn.ReLU(),  # relu3-4
+            nn.MaxPool2d((2, 2), (2, 2), (0, 0), ceil_mode=True),
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(256, 512, (3, 3)),
+            nn.ReLU(),  # relu4-1, this is the last layer used
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(512, 512, (3, 3)),
+            nn.ReLU(),  # relu4-2
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(512, 512, (3, 3)),
+            nn.ReLU(),  # relu4-3
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(512, 512, (3, 3)),
+            nn.ReLU(),  # relu4-4
+            nn.MaxPool2d((2, 2), (2, 2), (0, 0), ceil_mode=True),
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(512, 512, (3, 3)),
+            nn.ReLU(),  # relu5-1
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(512, 512, (3, 3)),
+            nn.ReLU(),  # relu5-2
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(512, 512, (3, 3)),
+            nn.ReLU(),  # relu5-3
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(512, 512, (3, 3)),
+            nn.ReLU()  # relu5-4
+        )
+
+
+        vgg.load_state_dict(torch.load('models/vgg_normalised.pth'))
+        vgg = nn.Sequential(*list(vgg.children())[:31])
+        enc_layers = list(vgg.children())
+        self.encoder_1 = nn.Sequential(*enc_layers[:4])  # input -> relu1_1
+        self.encoder_2 = nn.Sequential(*enc_layers[4:11])  # relu1_1 -> relu2_1
+        self.encoder_3 = nn.Sequential(*enc_layers[11:18])  # relu2_1 -> relu3_1
+        self.encoder_4 = nn.Sequential(*enc_layers[18:31])  # relu3_1 -> relu4_1
+        # fix the encoder
+        for name in ['encoder_1', 'encoder_2', 'encoder_3', 'encoder_4']:
+            for param in getattr(self, name).parameters():
+                param.requires_grad = False
+                
+    def forward(self, x):
+        x = self.encoder_1(x)
+        x = self.encoder_2(x)
+        x = self.encoder_3(x)
+        x = self.encoder_4(x)
+        return x
+    
 vgg_layers_styleloss = {'relu1_1': [0, 1], 'relu2_1': [2, 3, 4, 5, 6], 'relu3_1': [
     7, 8, 9, 10, 11], 'relu4_1': [12, 13, 14, 15, 16, 17, 18, 19, 20]}
-
 
 class Encoder(nn.Module):
     def __init__(self):
@@ -126,13 +206,54 @@ class Decoder(nn.Module):  # check the choice of the layers
         x = self.decoder_1(x)
         return x
 
+class Decoder_1B(nn.Module):  # check the choice of the layers
+    def __init__(self):
+        super(Decoder_1B, self).__init__()
+
+        self.decoder = nn.Sequential(
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(512, 256, (3, 3)),
+            nn.ReLU(),
+            nn.Upsample(scale_factor=2, mode='nearest'),
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(256, 256, (3, 3)),
+            nn.ReLU(),
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(256, 256, (3, 3)),
+            nn.ReLU(),
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(256, 256, (3, 3)),
+            nn.ReLU(),
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(256, 128, (3, 3)),
+            nn.ReLU(),
+            nn.Upsample(scale_factor=2, mode='nearest'),
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(128, 128, (3, 3)),
+            nn.ReLU(),
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(128, 64, (3, 3)),
+            nn.ReLU(),
+            nn.Upsample(scale_factor=2, mode='nearest'),
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(64, 64, (3, 3)),
+            nn.ReLU(),
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(64, 3, (3, 3)),
+        )
+
+    def forward(self, x):
+        return self.decoder(x)
 
 class StyleTransferNet(nn.Module):
-    def __init__(self, skip_connections=False, alpha=1.0):
+    def __init__(self, skip_connections=False, alpha=1.0, normed_vgg=False):
         super(StyleTransferNet, self).__init__()
-        self.encoder = Encoder()
-        for param in self.encoder.parameters():
-            param.requires_grad = False  # freeze the encoder
+        if not normed_vgg:
+            self.encoder = Encoder()
+            for param in self.encoder.parameters():
+                param.requires_grad = False  # freeze the encoder
+        else:
+            self.encoder = Alternative_Encoder()
         self.decoder = Decoder()
         self.skip_connections = skip_connections
 

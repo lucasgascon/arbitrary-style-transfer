@@ -19,7 +19,7 @@ def vizualize_preds(content_img, style_img, styled_img, normalize = True):
     if normalize:
         content_img = unnormalize(content_img.detach().cpu(),*stats)
         style_img = unnormalize(style_img.detach().cpu(),*stats)
-        # styled_img = unnormalize(styled_img.detach().cpu(),*stats)
+        styled_img = unnormalize(styled_img.detach().cpu(),*stats)
         styled_img = styled_img.detach().cpu()
     else :
         content_img = content_img.detach().cpu()
