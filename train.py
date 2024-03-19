@@ -182,7 +182,7 @@ def train(args):
                 print("Error in validation")
                 pass
                     
-        if args.show_prediction:
+        if args.show_prediction and epoch%5==0:
                     print('Displaying the styled images')
                     fig, ax = vizualize_preds(content_imgs[0], style_imgs[0], styled_images[0], normalize = args.normalize)
                     fig.savefig('results/Images_random_'+args.model_name+'_{:d}.png'.format(epoch))
@@ -192,7 +192,7 @@ def train(args):
                     style_features = model.encoder(test_style_img.unsqueeze(0))
                     t = adain(content_features, style_features)
                     test_styled_img = model.decoder(t).squeeze(0)
-                    fig, ax = vizualize_preds(test_content_img, test_style_img, test_styled_img, normalize = args.normalize)
+                    fig, ax = vizualize_preds(test_content_img, test_style_img, test_styled_img)
                     fig.savefig('results/Images_lenna_'+args.model_name+'_{:d}.png'.format(epoch))
 
 
