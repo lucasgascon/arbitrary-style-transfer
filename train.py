@@ -9,6 +9,7 @@ import numpy as np
 import wandb
 import copy
 from utils import vizualize_preds
+from test import load_one_img
 
 # torch.autograd.set_detect_anomaly(True)
 
@@ -23,8 +24,11 @@ def adjust_learning_rate(optimizer, lr, lr_decay, iteration_count):
 def train(args):
     """Enable to monitor results during training
     """
+    test_content_path = 'data/val2017/lenna.jpg'
+    test_style_path = 'data/wikiart_small/picasso_seated_nude_hr.jpg'
     args.model_name = args.model_name + '_skipco_' + str(args.skipco)+ '_normed_vgg_' + str(args.normed_vgg) + '_normalize_' + str(args.normalize) + '_style_weight_' + str(args.style_weight) + '_lr_' + str(args.lr)+ '_alpha_' + str(args.alpha) 
-
+    test_content_img = load_one_img(test_content_path).to(device)
+    test_style_img = load_one_img(test_style_path).to(device)
     if (args.wandb):
         wandb.init(
             name=args.model_name,
@@ -164,8 +168,8 @@ def train(args):
 
                         decoder_loss = content_loss + args.style_weight * style_loss
                         eval_decoder_loss.append(decoder_loss.item())
-                        eval_content_loss.append(content_loss.item)
-                        eval_style_loss.append(style_loss.item)
+                        eval_content_loss.append(content_loss.item())
+                        eval_style_loss.append(style_loss.item())
 
                     print('Epoch: ', epoch, 'Valid Content loss: ', eval_content_loss.mean(), 'Valid Style loss: ', eval_style_loss.mean(),
                         'Valid Total loss: ', eval_decoder_loss.mean())
@@ -181,7 +185,16 @@ def train(args):
         if args.show_prediction:
                     print('Displaying the styled images')
                     fig, ax = vizualize_preds(content_imgs[0], style_imgs[0], styled_images[0], normalize = args.normalize)
-                    fig.savefig('results/Images_'+args.model_name+'_{:d}.png'.format(epoch))
+                    fig.savefig('results/Images_random_'+args.model_name+'_{:d}.png'.format(epoch))
+                    
+
+                    content_features = model.encoder(test_content_img.unsqueeze(0))
+                    style_features = model.encoder(test_style_img.unsqueeze(0))
+                    t = adain(content_features, style_features)
+                    test_styled_img = model.decoder(t).squeeze(0)
+                    fig, ax = vizualize_preds(test_content_img, test_style_img, test_styled_img, normalize = args.normalize)
+                    fig.savefig('results/Images_lenna_'+args.model_name+'_{:d}.png'.format(epoch))
+
 
 
         if epoch % args.save_model_interval == 0:
@@ -208,7 +221,7 @@ if __name__ == '__main__':
                         help="wandb username or team name to which runs are attributed"
                         )
     parser.add_argument('--n_epochs', type=int,
-                        default=10, help='Number of epochs')
+                        default=50, help='Number of epochs')
     parser.add_argument('--save_model_interval', type=int, default=2)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     parser.add_argument('--device', type=str, default=device,
