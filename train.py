@@ -248,7 +248,7 @@ if __name__ == '__main__':
     parser.add_argument('--model_name', type=str,
                         default=None, help='Path to save the trained model')
 
-    parser.add_argument('--skipco', action='store_true',
+    parser.add_argument('--skipco', type=float, default=0.0,
                         help='Use skip connections in the decoder')
     parser.add_argument('--skip_type', type=str, default='content',
                         help='Which skip connection to use')

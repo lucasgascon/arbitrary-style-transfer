@@ -161,11 +161,11 @@ class Decoder(nn.Module):  # check the choice of the layers
         self.decoder_4 = nn.Sequential(
             nn.ReflectionPad2d((1, 1, 1, 1)),
             nn.Conv2d(512, 256, (3, 3)),
-            nn.ReLU()
+            nn.ReLU(),
+            nn.Upsample(scale_factor=2, mode='nearest'),
         )
 
         self.decoder_3 = nn.Sequential(
-            nn.Upsample(scale_factor=2, mode='nearest'),
             nn.ReflectionPad2d((1, 1, 1, 1)),
             nn.Conv2d(256, 256, (3, 3)),
             nn.ReLU(),
@@ -177,21 +177,21 @@ class Decoder(nn.Module):  # check the choice of the layers
             nn.ReLU(),
             nn.ReflectionPad2d((1, 1, 1, 1)),
             nn.Conv2d(256, 128, (3, 3)),
-            nn.ReLU()
+            nn.ReLU(),
+            nn.Upsample(scale_factor=2, mode='nearest'),
         )
 
         self.decoder_2 = nn.Sequential(
-            nn.Upsample(scale_factor=2, mode='nearest'),
             nn.ReflectionPad2d((1, 1, 1, 1)),
             nn.Conv2d(128, 128, (3, 3)),
             nn.ReLU(),
             nn.ReflectionPad2d((1, 1, 1, 1)),
             nn.Conv2d(128, 64, (3, 3)),
-            nn.ReLU()
+            nn.ReLU(),
+            nn.Upsample(scale_factor=2, mode='nearest'),
         )
 
         self.decoder_1 = nn.Sequential(
-            nn.Upsample(scale_factor=2, mode='nearest'),
             nn.ReflectionPad2d((1, 1, 1, 1)),
             nn.Conv2d(64, 64, (3, 3)),
             nn.ReLU(),
@@ -246,7 +246,7 @@ class Decoder_1B(nn.Module):  # check the choice of the layers
         return self.decoder(x)
 
 class StyleTransferNet(nn.Module):
-    def __init__(self, skip_connections=False, alpha=1.0, normed_vgg=False, skip_type = None):
+    def __init__(self, skip_connections=0, alpha=1.0, normed_vgg=False, skip_type = None):
         super(StyleTransferNet, self).__init__()
         if not normed_vgg:
             self.encoder = Encoder()
@@ -281,40 +281,40 @@ class StyleTransferNet(nn.Module):
         # Input is 512 channels and output is 256 channels
         g_t = self.decoder.decoder_4(t)
 
-        if self.skip_connections:
+        if self.skip_connections>0:
             if self.skip_type == 'content':
-                g_t = g_t + content_3
+                g_t = g_t + content_3*self.skip_connections
             elif self.skip_type == 'style':
-                g_t = g_t + style_3
+                g_t = g_t + style_3*self.skip_connections
             elif self.skip_type == 'both':
-                g_t = g_t + content_3 + style_3
+                g_t = g_t + (content_3 + style_3)*self.skip_connections
                 
 
 
         # Input is 256 channels and output is 128 channels
         g_t = self.decoder.decoder_3(g_t)
 
-        if self.skip_connections:
+        if self.skip_connections>0:
             if self.skip_type == 'content':
-                g_t = g_t + content_2
+                g_t = g_t + content_2*self.skip_connections
             elif self.skip_type == 'style':
-                g_t = g_t + style_2
+                g_t = g_t + style_2*self.skip_connections
             elif self.skip_type == 'both':
-                g_t = g_t + content_2 + style_2
+                g_t = g_t + (content_2 + style_2)*self.skip_connections
                 
 
 
         # Input is 128 channels and output is 64 channels
         g_t = self.decoder.decoder_2(g_t)
 
-        if self.skip_connections:
+        if self.skip_connections>0:
             
             if self.skip_type == 'content':
-                g_t = g_t + content_1
+                g_t = g_t + content_1*self.skip_connections
             elif self.skip_type == 'style':
-                g_t = g_t + style_1
+                g_t = g_t + style_1*self.skip_connections
             elif self.skip_type == 'both':
-                g_t = g_t + content_1 + style_1
+                g_t = g_t + (content_1 + style_1)*self.skip_connections
                 
 
 
