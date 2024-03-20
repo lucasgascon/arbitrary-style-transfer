@@ -246,7 +246,7 @@ class Decoder_1B(nn.Module):  # check the choice of the layers
         return self.decoder(x)
 
 class StyleTransferNet(nn.Module):
-    def __init__(self, skip_connections=False, alpha=1.0, normed_vgg=False):
+    def __init__(self, skip_connections=False, alpha=1.0, normed_vgg=False, skip_type = None):
         super(StyleTransferNet, self).__init__()
         if not normed_vgg:
             self.encoder = Encoder()
@@ -256,6 +256,7 @@ class StyleTransferNet(nn.Module):
             self.encoder = Alternative_Encoder()
         self.decoder = Decoder()
         self.skip_connections = skip_connections
+        self.skip_type = skip_type
 
         assert 0 <= alpha <= 1
         self.alpha = alpha
@@ -281,24 +282,46 @@ class StyleTransferNet(nn.Module):
         g_t = self.decoder.decoder_4(t)
 
         if self.skip_connections:
-            g_t = g_t   + content_3
+            if self.skip_type == 'content':
+                g_t = g_t + content_3
+            elif self.skip_type == 'style':
+                g_t = g_t + style_3
+            elif self.skip_type == 'both':
+                g_t = g_t + content_3 + style_3
+                
+
 
         # Input is 256 channels and output is 128 channels
         g_t = self.decoder.decoder_3(g_t)
 
         if self.skip_connections:
-            g_t = g_t  + content_2
+            if self.skip_type == 'content':
+                g_t = g_t + content_2
+            elif self.skip_type == 'style':
+                g_t = g_t + style_2
+            elif self.skip_type == 'both':
+                g_t = g_t + content_2 + style_2
+                
+
 
         # Input is 128 channels and output is 64 channels
         g_t = self.decoder.decoder_2(g_t)
 
         if self.skip_connections:
-            g_t = g_t  + content_1
+            
+            if self.skip_type == 'content':
+                g_t = g_t + content_1
+            elif self.skip_type == 'style':
+                g_t = g_t + style_1
+            elif self.skip_type == 'both':
+                g_t = g_t + content_1 + style_1
+                
+
 
         # Input is 64 channels and output is 3 channels
         g_t = self.decoder.decoder_1(g_t)
 
-        return g_t
+        return g_t, t
 
 # <bound method Module.named_parameters of VGG(
 #   (features): Sequential(

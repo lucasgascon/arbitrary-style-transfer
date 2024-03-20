@@ -6,3 +6,4 @@ test.ipynb
 old_results/
 results/
 .DS_Store
+experiments.py

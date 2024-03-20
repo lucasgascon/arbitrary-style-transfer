@@ -26,7 +26,8 @@ def train(args):
     """
     test_content_path = 'data/val2017/lenna.jpg'
     test_style_path = 'data/wikiart_small/picasso_seated_nude_hr.jpg'
-    args.model_name = args.model_name + '_skipco_' + str(args.skipco)+ '_normed_vgg_' + str(args.normed_vgg) + '_normalize_' + str(args.normalize) + '_style_weight_' + str(args.style_weight) + '_lr_' + str(args.lr)+ '_alpha_' + str(args.alpha) 
+    if args.model_name is None:
+        args.model_name = 'skipco_' + str(args.skipco)+ '_normed_vgg_' + str(args.normed_vgg) + '_normalize_' + str(args.normalize) + '_style_weight_' + str(args.style_weight) + '_lr_' + str(args.lr)+ '_alpha_' + str(args.alpha) 
     test_content_img = load_one_img(test_content_path).to(device)
     test_style_img = load_one_img(test_style_path).to(device)
     if (args.wandb):
@@ -64,7 +65,8 @@ def train(args):
         print('Content test images: ', len(content_testloader))
         print('Style test images: ', len(style_testloader)) 
 
-    model = StyleTransferNet(args.skipco, args.alpha, args.normed_vgg)
+    model = StyleTransferNet(skip_connections=args.skipco, alpha = args.alpha, 
+                             normed_vgg = args.normed_vgg, skip_type = args.skip_type)
 
     optimizer = torch.optim.Adam(model.decoder.parameters(), lr=args.lr)
 
@@ -92,13 +94,9 @@ def train(args):
             content_batch = content_imgs.to(args.device)
             style_batch = style_imgs.to(args.device)
 
-            content_features = model.encoder(content_batch)
-            style_features = model.encoder(style_batch)
-            t = adain(content_features, style_features)
-            styled_images = model.decoder(t)
-            output = styled_images
+            output, t = model.forward(content_batch, style_batch)
             invert_output = model.encoder(output)
-            
+            styled_images = output
             # compute the content loss
             assert (t.requires_grad is False)
             content_loss = mse_loss(invert_output, t)
@@ -197,7 +195,7 @@ def train(args):
 
 
 
-        if epoch % args.save_model_interval == 0:
+        if epoch % args.save_model_interval == 0 and epoch != 0:
             state_dict = model.decoder.state_dict()
             for key in state_dict.keys():
                 state_dict[key] = state_dict[key].to(torch.device('cpu'))
@@ -221,8 +219,8 @@ if __name__ == '__main__':
                         help="wandb username or team name to which runs are attributed"
                         )
     parser.add_argument('--n_epochs', type=int,
-                        default=50, help='Number of epochs')
-    parser.add_argument('--save_model_interval', type=int, default=5)
+                        default=32, help='Number of epochs')
+    parser.add_argument('--save_model_interval', type=int, default=30)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     parser.add_argument('--device', type=str, default=device,
                         help='Device to train the model')
@@ -248,10 +246,12 @@ if __name__ == '__main__':
     parser.add_argument('--test_style_imgs', type=str,
                         default='data/wikiart_small', help='Path to the test style images')
     parser.add_argument('--model_name', type=str,
-                        default='model.pth', help='Path to save the trained model')
+                        default=None, help='Path to save the trained model')
 
     parser.add_argument('--skipco', action='store_true',
                         help='Use skip connections in the decoder')
+    parser.add_argument('--skip_type', type=str, default='content',
+                        help='Which skip connection to use')
     parser.add_argument('--alpha', type=float, default=1.,
                         help='Alpha value for style/content tradeoff')
     parser.add_argument('--normalize',action="store_true", default=False,
