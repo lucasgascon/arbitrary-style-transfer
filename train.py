@@ -27,7 +27,8 @@ def train(args):
     test_content_path = 'data/val2017/lenna.jpg'
     test_style_path = 'data/wikiart_small/picasso_seated_nude_hr.jpg'
     if args.model_name is None:
-        args.model_name = 'skipco_' + str(args.skipco)+ '_normed_vgg_' + str(args.normed_vgg) + '_normalize_' + str(args.normalize) + '_style_weight_' + str(args.style_weight) + '_lr_' + str(args.lr)+ '_alpha_' + str(args.alpha) 
+        args.model_name = 'skipco_' + str(args.skipco) + '_normed_vgg_' + str(args.normed_vgg) + '_normalize_' + str(
+            args.normalize) + '_style_weight_' + str(args.style_weight) + '_lr_' + str(args.lr) + '_alpha_' + str(args.alpha)
     test_content_img = load_one_img(test_content_path).to(device)
     test_style_img = load_one_img(test_style_path).to(device)
     if (args.wandb):
@@ -59,38 +60,37 @@ def train(args):
         content_testloader, style_testloader = create_dataloader(
             args.test_content_imgs, args.test_style_imgs, trainset=False, batch_size=1, shuffle=False, normalize=args.normalize)
     print('Data loaded successfully')
-    print('Content train images: ', len(content_trainloader)*args.batch_size) 
+    print('Content train images: ', len(content_trainloader)*args.batch_size)
     print('Style train images: ', len(style_trainloader)*args.batch_size)
-    if args.test:   
+    if args.test:
         print('Content test images: ', len(content_testloader))
-        print('Style test images: ', len(style_testloader)) 
+        print('Style test images: ', len(style_testloader))
 
-    model = StyleTransferNet(skip_connections=args.skipco, alpha = args.alpha, 
-                             normed_vgg = args.normed_vgg, skip_type = args.skip_type, cat_decoder=args.cat_skip)
+    model = StyleTransferNet(skip_connections=args.skipco, alpha=args.alpha,
+                             normed_vgg=args.normed_vgg, skip_type=args.skip_type, cat_decoder=args.cat_skip)
 
     optimizer = torch.optim.Adam(model.decoder.parameters(), lr=args.lr)
 
     mse_loss = torch.nn.MSELoss()
 
     model.to(args.device)
-    
+
     # # Check encoder freeze:
     # for param in model.encoder.parameters():
     #     print('Encoder parameters: ', param.requires_grad)
     #     assert (param.requires_grad is False)
-        
+
     # # Check decoder unfreeze:
     # for param in model.decoder.parameters():
     #     print('Decoder parameters: ', param.requires_grad)
 
-    
     count = 0
     for epoch in range(args.n_epochs):
         model.train()
         for i, (content_imgs, style_imgs) in tqdm(enumerate(zip(content_trainloader, style_trainloader))):
             adjust_learning_rate(optimizer, args.lr,
                                  args.lr_decay, count)
-       
+
             content_batch = content_imgs.to(args.device)
             style_batch = style_imgs.to(args.device)
 
@@ -118,7 +118,6 @@ def train(args):
             optimizer.zero_grad()
             decoder_loss.backward()
             optimizer.step()
-        
 
             if i == 0:
                 print('Epoch: ', epoch, 'Content loss: ', content_loss.item(), 'Style loss: ', style_loss.item(),
@@ -127,9 +126,9 @@ def train(args):
             if (args.wandb):
                 wandb.log({'Train content Loss': content_loss.item(), ' Train style loss': style_loss.item(),
                            'Train overall Loss': decoder_loss.item()})
-      
+
             count += 1
-        if args.test :
+        if args.test:
             model.eval()
             print('Validating the model')
             try:
@@ -156,13 +155,15 @@ def train(args):
                         style_loss = 0
                         for j in range(4):
                             # Take the accurate layer from the encoder
-                            layer = getattr(model.encoder, 'encoder_{:d}'.format(j + 1))
+                            layer = getattr(
+                                model.encoder, 'encoder_{:d}'.format(j + 1))
                             style_batch = layer(style_batch)
                             output = layer(output)
                             assert (style_batch.requires_grad is False)
                             meanS, stdS = calc_mean_std(style_batch)
                             meanG, stdG = calc_mean_std(output)
-                            style_loss += mse_loss(meanS, meanG) + mse_loss(stdS, stdG)
+                            style_loss += mse_loss(meanS,
+                                                   meanG) + mse_loss(stdS, stdG)
 
                         decoder_loss = content_loss + args.style_weight * style_loss
                         eval_decoder_loss.append(decoder_loss.item())
@@ -170,40 +171,38 @@ def train(args):
                         eval_style_loss.append(style_loss.item())
 
                     print('Epoch: ', epoch, 'Valid Content loss: ', eval_content_loss.mean(), 'Valid Style loss: ', eval_style_loss.mean(),
-                        'Valid Total loss: ', eval_decoder_loss.mean())
-                    
+                          'Valid Total loss: ', eval_decoder_loss.mean())
+
                     # Logging to Weights and Biases
                     if (args.wandb):
                         wandb.log({'Valid content loss': content_loss.item(), 'Valid style loss': style_loss.item(),
-                                'Valid overall loss': decoder_loss.item()})
+                                   'Valid overall loss': decoder_loss.item()})
             except:
                 print("Error in validation")
                 pass
-                    
-        if args.show_prediction and epoch%5==0:
-                    print('Displaying the styled images')
-                    fig, ax = vizualize_preds(content_imgs[0], style_imgs[0], styled_images[0], normalize = args.normalize)
-                    fig.savefig('results/Images_random_'+args.model_name+'_{:d}.png'.format(epoch))
-                    
 
-                    content_features = model.encoder(test_content_img.unsqueeze(0))
-                    style_features = model.encoder(test_style_img.unsqueeze(0))
-                    t = adain(content_features, style_features)
-                    test_styled_img = model.decoder(t).squeeze(0)
-                    fig, ax = vizualize_preds(test_content_img, test_style_img, test_styled_img)
-                    fig.savefig('results/Images_lenna_'+args.model_name+'_{:d}.png'.format(epoch))
+        if args.show_prediction and epoch % 5 == 0:
+            print('Displaying the styled images')
+            fig, ax = vizualize_preds(
+                content_imgs[0], style_imgs[0], styled_images[0], normalize=args.normalize)
+            fig.savefig('results/Images_random_' +
+                        args.model_name+'_{:d}.png'.format(epoch))
 
 
+            output, t = model.forward(content_batch.unsqueeze(0), style_batch.unsqueeze(0))
+            invert_output = model.encoder(output)
+            test_styled_img = output.squeeze(0)
+            fig, ax = vizualize_preds(
+                test_content_img, test_style_img, test_styled_img)
+            fig.savefig('results/Images_lenna_' +
+                        args.model_name+'_{:d}.png'.format(epoch))
 
         if epoch % args.save_model_interval == 0 and epoch != 0:
             state_dict = model.decoder.state_dict()
             for key in state_dict.keys():
                 state_dict[key] = state_dict[key].to(torch.device('cpu'))
             torch.save(state_dict, 'models/'+args.model_name +
-                        'decoder_epoch_{:d}.pth.tar'.format(epoch))
-
-
-
+                       'decoder_epoch_{:d}.pth.tar'.format(epoch))
 
     if args.wandb:
         wandb.finish()
@@ -254,11 +253,12 @@ if __name__ == '__main__':
                         help='Which skip connection to use')
     parser.add_argument('--alpha', type=float, default=1.,
                         help='Alpha value for style/content tradeoff')
-    parser.add_argument('--normalize',action="store_true", default=False,
+    parser.add_argument('--normalize', action="store_true", default=False,
                         help="Normalize with ImageNet stats")
-    parser.add_argument('--normed_vgg',action="store_true", default=False,
+    parser.add_argument('--normed_vgg', action="store_true", default=False,
                         help="Whether to use the VGG model with normalization or not")
-    parser.add_argument('--cat_skip', action = "store_true", default = False, help = "Whether to use concatenative skip connections or not")
+    parser.add_argument('--cat_skip', action="store_true", default=False,
+                        help="Whether to use concatenative skip connections or not")
 
     args = parser.parse_args()
 
