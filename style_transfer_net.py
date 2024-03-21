@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torchvision.models import vgg19, VGG19_Weights
 
 
@@ -153,7 +154,7 @@ class Encoder(nn.Module):
         x = self.encoder_4(x)
         return x
 
-
+    
 class Decoder(nn.Module):  # check the choice of the layers
     def __init__(self):
         super(Decoder, self).__init__()
@@ -245,8 +246,82 @@ class Decoder_1B(nn.Module):  # check the choice of the layers
     def forward(self, x):
         return self.decoder(x)
 
+
+class cat_Decoder(nn.Module):  # check the choice of the layers
+    def __init__(self):
+        super(cat_Decoder, self).__init__()
+
+        self.decoder_4 = nn.Sequential(
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(512, 256, (3, 3)),
+            nn.ReLU(),
+            nn.Upsample(scale_factor=2, mode='nearest'),
+        )
+        
+
+        self.decoder_3_cat = nn.Sequential(
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(256, 128, (3, 3)),
+            nn.ReLU(),
+            nn.Upsample(scale_factor=2, mode='nearest'),
+        )
+
+        self.decoder_3 = nn.Sequential(
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(256, 256, (3, 3)),
+            nn.ReLU(),
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(256, 256, (3, 3)),
+            nn.ReLU(),
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(256, 128, (3, 3)),
+            nn.ReLU(),
+        )
+
+        
+
+        self.decoder_2_cat = nn.Sequential(
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(128, 64, (3, 3)),
+            nn.ReLU(),
+            nn.Upsample(scale_factor=2, mode='nearest'),
+        )
+
+
+        self.decoder_2 = nn.Sequential(
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(128, 128, (3, 3)),
+            nn.ReLU(),
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(128, 128, (3, 3)),
+            nn.ReLU(),
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(128, 64, (3, 3)),
+            nn.ReLU(),
+        )
+
+
+        self.decoder_1 = nn.Sequential(
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(64, 64, (3, 3)),
+            nn.ReLU(),
+            nn.ReflectionPad2d((1, 1, 1, 1)),
+            nn.Conv2d(64, 3, (3, 3)),
+        )
+
+          
+
+    def forward(self, x):
+        x = self.decoder_4(x)
+        x = self.decoder_3(x)
+        x = self.decoder_3_cat(x)
+        x = self.decoder_2(x)
+        x = self.decoder_2_cat(x)
+        x = self.decoder_1(x)
+        return x
+    
 class StyleTransferNet(nn.Module):
-    def __init__(self, skip_connections=0, alpha=1.0, normed_vgg=False, skip_type = None):
+    def __init__(self, skip_connections=0, alpha=1.0, normed_vgg=False, skip_type = None, cat_decoder = False):
         super(StyleTransferNet, self).__init__()
         if not normed_vgg:
             self.encoder = Encoder()
@@ -254,7 +329,14 @@ class StyleTransferNet(nn.Module):
                 param.requires_grad = False  # freeze the encoder
         else:
             self.encoder = Alternative_Encoder()
-        self.decoder = Decoder()
+        if cat_decoder:
+            self.decoder = cat_Decoder()
+            self.cat = True
+            
+        else:
+            self.cat = False
+            self.decoder = Decoder()
+            
         self.skip_connections = skip_connections
         self.skip_type = skip_type
 
@@ -277,49 +359,84 @@ class StyleTransferNet(nn.Module):
         t = adain(content_4, style_4)
         t = self.alpha * t + (1 - self.alpha) * content_4
 
-        
-        # Input is 512 channels and output is 256 channels
-        g_t = self.decoder.decoder_4(t)
-
-        if self.skip_connections>0:
+        if self.cat:
+             # Input is 512 channels and output is 256 channels
+            g_t = self.decoder.decoder_4(t)
+            g_t = self.decoder.decoder_3_cat(g_t) # 128 channels
+ 
             if self.skip_type == 'content':
-                g_t = g_t + content_3*self.skip_connections
+                # g_t = F.interpolate(g_t, size=content_2.size()[
+                #             2:], mode='bilinear', align_corners=False)
+                g_t = torch.cat([g_t, content_2], dim=1)
             elif self.skip_type == 'style':
-                g_t = g_t + style_3*self.skip_connections
-            elif self.skip_type == 'both':
-                g_t = g_t + (content_3 + style_3)*self.skip_connections
-                
+                # g_t = F.interpolate(g_t, size=style_2.size()[
+                #             2:], mode='bilinear', align_corners=False)
+                g_t = torch.cat([g_t, style_2], dim=1)
+                    
 
 
-        # Input is 256 channels and output is 128 channels
-        g_t = self.decoder.decoder_3(g_t)
-
-        if self.skip_connections>0:
-            if self.skip_type == 'content':
-                g_t = g_t + content_2*self.skip_connections
-            elif self.skip_type == 'style':
-                g_t = g_t + style_2*self.skip_connections
-            elif self.skip_type == 'both':
-                g_t = g_t + (content_2 + style_2)*self.skip_connections
-                
-
-
-        # Input is 128 channels and output is 64 channels
-        g_t = self.decoder.decoder_2(g_t)
-
-        if self.skip_connections>0:
+            # Input is 256 channels and output is 128 channels
+            g_t = self.decoder.decoder_3(g_t)
+            g_t = self.decoder.decoder_2_cat(g_t) # 64 channels
+            
             
             if self.skip_type == 'content':
-                g_t = g_t + content_1*self.skip_connections
+                # g_t = F.interpolate(g_t, size=content_1.size()[
+                #             2:], mode='bilinear', align_corners=False)
+                g_t = torch.cat([g_t, content_1], dim=1)
             elif self.skip_type == 'style':
-                g_t = g_t + style_1*self.skip_connections
-            elif self.skip_type == 'both':
-                g_t = g_t + (content_1 + style_1)*self.skip_connections
+                # g_t = F.interpolate(g_t, size=style_1.size()[
+                #             2:], mode='bilinear', align_corners=False)
+                g_t = torch.cat([g_t, style_1], dim=1)
                 
 
+            # Input is 128 channels and output is 64 channels
+            g_t = self.decoder.decoder_2(g_t)
 
-        # Input is 64 channels and output is 3 channels
-        g_t = self.decoder.decoder_1(g_t)
+            # Input is 64 channels and output is 3 channels
+            g_t = self.decoder.decoder_1(g_t)
+             
+        else:
+            # Input is 512 channels and output is 256 channels
+            g_t = self.decoder.decoder_4(t)
+
+            if self.skip_connections>0:
+                if self.skip_type == 'content':
+                    g_t = g_t + content_3*self.skip_connections
+                elif self.skip_type == 'style':
+                    g_t = g_t + style_3*self.skip_connections
+                elif self.skip_type == 'both':
+                    g_t = g_t + (content_3 + style_3)*self.skip_connections
+                    
+
+
+            # Input is 256 channels and output is 128 channels
+            g_t = self.decoder.decoder_3(g_t)
+
+            if self.skip_connections>0:
+                if self.skip_type == 'content':
+                    g_t = g_t + content_2*self.skip_connections
+                elif self.skip_type == 'style':
+                    g_t = g_t + style_2*self.skip_connections
+                elif self.skip_type == 'both':
+                    g_t = g_t + (content_2 + style_2)*self.skip_connections
+                    
+
+
+            # Input is 128 channels and output is 64 channels
+            g_t = self.decoder.decoder_2(g_t)
+
+            if self.skip_connections>0:
+                
+                if self.skip_type == 'content':
+                    g_t = g_t + content_1*self.skip_connections
+                elif self.skip_type == 'style':
+                    g_t = g_t + style_1*self.skip_connections
+                elif self.skip_type == 'both':
+                    g_t = g_t + (content_1 + style_1)*self.skip_connections
+                    
+            # Input is 64 channels and output is 3 channels
+            g_t = self.decoder.decoder_1(g_t)
 
         return g_t, t
 

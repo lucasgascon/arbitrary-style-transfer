@@ -66,7 +66,7 @@ def train(args):
         print('Style test images: ', len(style_testloader)) 
 
     model = StyleTransferNet(skip_connections=args.skipco, alpha = args.alpha, 
-                             normed_vgg = args.normed_vgg, skip_type = args.skip_type)
+                             normed_vgg = args.normed_vgg, skip_type = args.skip_type, cat_decoder=args.cat_skip)
 
     optimizer = torch.optim.Adam(model.decoder.parameters(), lr=args.lr)
 
@@ -258,6 +258,7 @@ if __name__ == '__main__':
                         help="Normalize with ImageNet stats")
     parser.add_argument('--normed_vgg',action="store_true", default=False,
                         help="Whether to use the VGG model with normalization or not")
+    parser.add_argument('--cat_skip', action = "store_true", default = False, help = "Whether to use concatenative skip connections or not")
 
     args = parser.parse_args()
 
