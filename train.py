@@ -14,7 +14,7 @@ from test import load_one_img
 # torch.autograd.set_detect_anomaly(True)
 
 
-def adjust_learning_rate(optimizer, lr, lr_decay, iteration_count):
+def adjust_lr(optimizer, lr, lr_decay, iteration_count):
     """Imitating the original implementation"""
     lr /= (1.0 + lr_decay * iteration_count)
     for param_group in optimizer.param_groups:
@@ -26,11 +26,13 @@ def train(args):
     """
     test_content_path = 'data/val2017/lenna.jpg'
     test_style_path = 'data/wikiart_small/picasso_seated_nude_hr.jpg'
+
     if args.model_name is None:
         args.model_name = 'skipco_' + str(args.skipco) + '_normed_vgg_' + str(args.normed_vgg) + '_normalize_' + str(
             args.normalize) + '_style_weight_' + str(args.style_weight) + '_lr_' + str(args.lr) + '_alpha_' + str(args.alpha)
     test_content_img = load_one_img(test_content_path).to(device)
     test_style_img = load_one_img(test_style_path).to(device)
+
     if (args.wandb):
         wandb.init(
             name=args.model_name,
@@ -75,21 +77,12 @@ def train(args):
 
     model.to(args.device)
 
-    # # Check encoder freeze:
-    # for param in model.encoder.parameters():
-    #     print('Encoder parameters: ', param.requires_grad)
-    #     assert (param.requires_grad is False)
-
-    # # Check decoder unfreeze:
-    # for param in model.decoder.parameters():
-    #     print('Decoder parameters: ', param.requires_grad)
-
     count = 0
     for epoch in range(args.n_epochs):
         model.train()
         for i, (content_imgs, style_imgs) in tqdm(enumerate(zip(content_trainloader, style_trainloader))):
-            adjust_learning_rate(optimizer, args.lr,
-                                 args.lr_decay, count)
+            adjust_lr(optimizer, args.lr,
+                      args.lr_decay, count)
 
             content_batch = content_imgs.to(args.device)
             style_batch = style_imgs.to(args.device)
@@ -188,8 +181,8 @@ def train(args):
             fig.savefig('results/Images_random_' +
                         args.model_name+'_{:d}.png'.format(epoch))
 
-
-            output, t = model.forward(content_batch.unsqueeze(0), style_batch.unsqueeze(0))
+            output, t = model.forward(
+                test_content_img.unsqueeze(0), test_style_img.unsqueeze(0))
             invert_output = model.encoder(output)
             test_styled_img = output.squeeze(0)
             fig, ax = vizualize_preds(

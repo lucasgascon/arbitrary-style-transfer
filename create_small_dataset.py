@@ -3,6 +3,9 @@ import random
 import shutil
 import argparse
 
+"""To reduce the size of a dataset by randomly selecting a subset of images.
+"""
+
 
 def create_small_dataset(source_dir, target_dir, n):
     # Create the target directory if it doesn't exist

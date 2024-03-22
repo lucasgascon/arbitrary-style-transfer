@@ -9,7 +9,6 @@ import numpy as np
 stats = ((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
 
 
-
 class CustomDataset(Dataset):
     def __init__(self, root_dir, transform=None):
         self.root_dir = root_dir
@@ -18,8 +17,6 @@ class CustomDataset(Dataset):
 
     def __len__(self):
         return len(self.image_files)
-    
-
 
     def __getitem__(self, idx):
         img_path = os.path.join(self.root_dir, self.image_files[idx])
@@ -30,7 +27,6 @@ class CustomDataset(Dataset):
             img = np.zeros((512, 512, 3), dtype=np.uint8)
         else:
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-      
 
         h, w, _ = img.shape
         if h < w:
@@ -40,7 +36,6 @@ class CustomDataset(Dataset):
             new_w = 512
             new_h = int(h * (512 / w))
         img = cv2.resize(img, (new_w, new_h))
-
 
         if self.transform is not None:
             img = self.transform(img)
@@ -55,13 +50,13 @@ def create_dataloader(content_path, style_path, trainset, batch_size=1, shuffle=
                 transforms.ToPILImage(),
                 transforms.RandomCrop(256),
                 transforms.ToTensor(),
-                transforms.Normalize(*stats, inplace = True)
+                transforms.Normalize(*stats, inplace=True)
             ])
         else:
             transform = transforms.Compose([
                 transforms.ToPILImage(),
                 transforms.ToTensor(),
-                transforms.Normalize(*stats, inplace = True)
+                transforms.Normalize(*stats, inplace=True)
             ])
     else:
         if trainset:
