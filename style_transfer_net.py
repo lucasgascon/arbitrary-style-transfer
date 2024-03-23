@@ -345,8 +345,8 @@ class StyleTransferNet(nn.Module):
             g_t = self.decoder.decoder_3_cat(g_t)  # 128 channels
 
             if self.skip_type == 'content':
-                # g_t = F.interpolate(g_t, size=content_2.size()[
-                #             2:], mode='bilinear', align_corners=False)
+                g_t = F.interpolate(g_t, size=content_2.size()[
+                            2:], mode='bilinear', align_corners=False)
                 g_t = torch.cat([g_t, content_2], dim=1)
             elif self.skip_type == 'style':
                 style_2 = F.interpolate(style_2, size=g_t.size()[
@@ -358,8 +358,8 @@ class StyleTransferNet(nn.Module):
             g_t = self.decoder.decoder_2_cat(g_t)  # 64 channels
 
             if self.skip_type == 'content':
-                # g_t = F.interpolate(g_t, size=content_1.size()[
-                #             2:], mode='bilinear', align_corners=False)
+                g_t = F.interpolate(g_t, size=content_1.size()[
+                            2:], mode='bilinear', align_corners=False)
                 g_t = torch.cat([g_t, content_1], dim=1)
             elif self.skip_type == 'style':
                 style_1 = F.interpolate(style_1, size=g_t.size()[

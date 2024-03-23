@@ -1,6 +1,6 @@
 __pycache__/
 data/
-models/
+old_models/
 
 test.ipynb
 old_results/

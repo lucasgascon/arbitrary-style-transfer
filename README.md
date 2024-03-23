@@ -35,7 +35,7 @@ The core technique used in this project is Adaptive Instance Normalization (AdaI
 
 Results for various style on various image contents using our implementation of skip-connected AdaIN architecture by concatenating content feature maps. The model has been trained for $30$ epochs. $\alpha$ has been set to $1$ and the style weight to $10$.
 
-![alt text](https://github.com/[username]/[reponame]/blob/[branch]/image.jpg?raw=true)
+![alt text](https://github.com/lucasgascon/arbitrary-style-transfer/results_cat.png?raw=true)
 
 
 
